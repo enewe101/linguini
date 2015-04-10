@@ -1,0 +1,10 @@
+build
+linguini.egg-info
+dist
+data
+docs/_build
+docs/_templates
+docs/_static
+*.pyc
+*.swo
+*.swp
