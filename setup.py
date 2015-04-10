@@ -4,7 +4,7 @@ from setuptools import setup
 
 setup(
 	name='linguini',
-	version='0.0',
+	version='1.0',
 	description='beats both spaghetti and ravioli',
 	author='edward newell',
 	author_email='edward.newell@gmail.com',
