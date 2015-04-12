@@ -108,6 +108,23 @@ class FileResource(Resource):
 
 class MarkerResource(FileResource):
 	def mark(self):
+
+		# if the marker path already exists, perfect
+		if os.path.isdir(self.get_path()):
+			pass
+
+		# if the marker path points to a file, not a dir, fail
+		elif os.path.exists(self.get_path()):
+			raise IOError(
+				('MarkerResource: I could not mark task `%s` as done because '
+				'there is a file in the place of the directory I am supposed '
+				'to write to') % self.name
+			)
+
+		# if the path doesn't exist yet, make it
+		else:
+			os.mkdirs(self.path)
+
 		self.open('a').write('%s\n' % str(datetime.now()))
 
 
@@ -158,7 +175,7 @@ class FolderResource(FileResource):
 	def open(self, fname, mode):
 
 		# check if the folder exists yet, make it if not 
-		if os.isdir(self.get_path()):
+		if os.path.isdir(self.get_path()):
 			pass
 
 		# if a file (rather than folder) exists, it's an error
@@ -174,7 +191,7 @@ class FolderResource(FileResource):
 			os.mkdir(self.get_path())
 
 		# check if the specific file exists (as a folder or file)
-		if os.isdir(self.get_fname()):
+		if os.path.isdir(self.get_fname()):
 			raise IOError(
 				'FolderResource: a file or folder exists there. '
 				'I can\'t make a file: %s' % self.get_fname()
