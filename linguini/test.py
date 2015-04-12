@@ -3,7 +3,7 @@ import unittest
 from unittest import TestCase
 from run import Runner, RunnerException
 from task import Task, TaskException, MarkedTask, SimpleTask
-from resource import Resource, FileResource
+from resource import Resource, FileResource, FolderResource
 import os
 
 
@@ -12,6 +12,44 @@ TEST_DIR = 'temporary_testing_files'
 
 def touch(fname):
 	open(fname, 'a').close()
+
+
+class TestFolderResource(TestCase):
+
+	def setUp(self):
+		os.mkdir(TEST_DIR)
+
+	def tearDown(self):
+		shutil.rmtree(TEST_DIR)
+		shutil.rmtree('./linguini_markers')
+
+	def test_basic_write(self):
+
+		dir_name = 'foldir'
+		file_name = 'fyle.txt'
+		lot_name = 'my_lot'
+
+		class MyTask(SimpleTask):
+			outputs = FolderResource(TEST_DIR, dir_name)
+			was_run = False
+			def run(self):
+				self.was_run = True
+				self.outputs.open(file_name, 'w').write('yo')
+
+		class MyRunner(Runner):
+			lot = lot_name
+			tasks = {
+				'task': MyTask()
+			}
+			layout = {
+				'END': 'task'
+			}
+
+		MyRunner().run()
+		expected_dir = os.path.join(TEST_DIR, '%s_%s' % (lot_name, dir_name))
+		expected_file = os.path.join(expected_dir, file_name)
+		self.assertTrue(os.path.isdir(expected_dir))
+		self.assertTrue(os.path.isfile(expected_file))
 
 
 class TestRunner(TestCase):

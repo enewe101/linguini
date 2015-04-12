@@ -22,8 +22,6 @@ class Resource(object):
 
 		return getattr(self, attr_name)
 
-
-
 		
 	def get_ready(self, lot, as_pilot, name, clobber):
 
@@ -110,11 +108,11 @@ class MarkerResource(FileResource):
 	def mark(self):
 
 		# if the marker path already exists, perfect
-		if os.path.isdir(self.get_path()):
+		if os.path.isdir(self.path):
 			pass
 
 		# if the marker path points to a file, not a dir, fail
-		elif os.path.exists(self.get_path()):
+		elif os.path.exists(self.path):
 			raise IOError(
 				('MarkerResource: I could not mark task `%s` as done because '
 				'there is a file in the place of the directory I am supposed '
@@ -123,7 +121,7 @@ class MarkerResource(FileResource):
 
 		# if the path doesn't exist yet, make it
 		else:
-			os.mkdirs(self.path)
+			os.makedirs(self.path)
 
 		self.open('a').write('%s\n' % str(datetime.now()))
 
@@ -169,17 +167,17 @@ class FolderResource(FileResource):
 		namespaced (because the folder is).
 	'''
 
-	def get_fname(self):
+	def get_fname(self, fname):
 		return os.path.join(self.get_path(), fname)
 
 	def open(self, fname, mode):
 
-		# check if the folder exists yet, make it if not 
+		# check if the folder exists yet, if yes, move on
 		if os.path.isdir(self.get_path()):
 			pass
 
 		# if a file (rather than folder) exists, it's an error
-		elif os.exists(self.get_path()):
+		elif os.path.exists(self.get_path()):
 			raise IOError(
 				'FolderResource: the given path corresponds to an existing '
 				'*file*.  I cannot create a directory here: %s' 
@@ -191,24 +189,24 @@ class FolderResource(FileResource):
 			os.mkdir(self.get_path())
 
 		# check if the specific file exists (as a folder or file)
-		if os.path.isdir(self.get_fname()):
+		if os.path.isdir(self.get_fname(fname)):
 			raise IOError(
 				'FolderResource: a file or folder exists there. '
-				'I can\'t make a file: %s' % self.get_fname()
+				'I can\'t make a file: %s' % self.get_fname(fname)
 			)
 
 		# if we're opening in write mode, don't overwrite an existing file
-		if 'w' in mode and os.isfile(self.get_fname()):
+		if 'w' in mode and os.path.isfile(self.get_fname(fname)):
 			raise IOError(
 				'FolderResource: a file already exists there. '
-				'I don not overwrite by default: %s' % self.get_fname()
+				'I don not overwrite by default: %s' % self.get_fname(fname)
 			)
 
 		# if all is good, open and yield the file resource
-		return open(self.get_fname(), mode)
+		return open(self.get_fname(fname), mode)
 
 
-	#TODO: defined exists
+	#TODO: define exists
 	def exists(self):
 		pass
 
