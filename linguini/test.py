@@ -2,14 +2,17 @@ import shutil
 import unittest
 from unittest import TestCase
 from run import Runner, RunnerException
-from task import Task, TaskException
+from task import Task, TaskException, MarkedTask, SimpleTask
 from resource import Resource, FileResource
 import os
 
+
 TEST_DIR = 'temporary_testing_files'
+
 
 def touch(fname):
 	open(fname, 'a').close()
+
 
 class TestRunner(TestCase):
 
@@ -143,6 +146,195 @@ class TestRunner(TestCase):
 		self.assertTrue(task3.was_run)
 
 
+class TestMarkerTask(TestCase):
+	def setUp(self):
+		os.mkdir(TEST_DIR)
+
+	def tearDown(self):
+		shutil.rmtree(TEST_DIR)
+
+	def test_mark_marks(self):
+
+		
+		class MyTask(MarkedTask):
+			marker_path = TEST_DIR
+			outputs = None
+			num_runs = 0
+			def run(self):
+				self.num_runs += 1
+
+		task1 = MyTask()
+		task_name = 'task1'
+		lot_name = 'my_lot'
+
+		class MyRunner(Runner):
+			lot = lot_name
+			tasks = {
+				task_name: task1
+			}
+			layout = {
+				'END': task_name
+			}
+
+		my_runner = MyRunner()
+
+		# run the runner
+		my_runner.run()
+		# check that the task was run
+		self.assertTrue(task1.num_runs == 1)
+
+		# run again
+		my_runner.run()
+		# this task should have been skipped due to existence of marker file
+		self.assertTrue(task1.num_runs == 1)
+
+		# remove the marker file
+		os.remove(
+			os.path.join(TEST_DIR, '%s_%s.marker' % (lot_name, task_name))
+		)
+
+		# run again
+		my_runner.run()
+		# the task should run again
+		self.assertTrue(task1.num_runs == 2)
+
+
+	def test_marker_as_mixin(self):
+		'''
+			this test is similar to the last, but it tests a situation where
+			a pre-existing task is augmented using the mixin approach.
+			rather than MyTask inheriting directly from MarkedTask,
+			MyTask is defined on top of Task, and then an augmented version
+			is made afterward, MyMarkedTask, by using MarkedTask as a mixin.
+
+			This tests all the conditions in test_marker_marks, but it also
+			tests that if MyTask overrides a method in Task, augmenting 
+			with MarkedTask as a mixin preserves that.
+
+			Of course, the `exists()` function is not preserved -- changing 
+			that is the whole reason for using the MarkedTask as a mixin.
+		'''
+		
+		class MyTask(Task):
+			ready_override = False
+			after_override = False
+			def get_ready(self, lot, as_pilot, name, clobber):
+				super(MyTask, self).get_ready(
+					lot, as_pilot, name, clobber
+				)
+				self.ready_override = True
+
+			def _after(self):
+				super(MyTask, self)._after()
+				self.after_override = True
+
+
+		class MyMarkedTask(MarkedTask, MyTask):
+			marker_path = TEST_DIR
+			outputs = None
+			num_runs = 0
+			def run(self):
+				self.num_runs += 1
+
+		task1 = MyMarkedTask()
+		task_name = 'task1'
+		lot_name = 'my_lot'
+
+		class MyRunner(Runner):
+			lot = lot_name
+			tasks = {
+				task_name: task1
+			}
+			layout = {
+				'END': task_name
+			}
+
+		my_runner = MyRunner()
+
+		# run the runner
+		my_runner.run()
+		# check that the task was run
+		self.assertTrue(task1.num_runs == 1)
+
+		# check that the version of get_ready from MyTask was run
+		self.assertTrue(task1.ready_override)
+		# check that the version of after from MyTask was run
+		self.assertTrue(task1.after_override)
+
+		# run again
+		my_runner.run()
+		# this task should have been skipped due to existence of marker file
+		self.assertTrue(task1.num_runs == 1)
+
+		# remove the marker file
+		os.remove(
+			os.path.join(TEST_DIR, '%s_%s.marker' % (lot_name, task_name))
+		)
+
+		# run again
+		my_runner.run()
+		# the task should run again
+		self.assertTrue(task1.num_runs == 2)
+
+
+class TestSimpleTask(TestCase):
+
+	TEST_DIR = 'linguini_markers'
+	def setUp(self):
+		os.mkdir(self.TEST_DIR)
+
+	def tearDown(self):
+		shutil.rmtree(self.TEST_DIR)
+
+	def test_simple_task(self):
+		'''
+			Simple task is based on marked task, and provides the simplest
+			interface for turning some piece of functionality into a linguini
+			task.  One simply defines the run function, that's all
+		'''
+
+		class MyTask(SimpleTask):
+			num_runs = 0
+			def run(self):
+				self.num_runs += 1
+
+		task1 = MyTask()
+		task_name = 'task1'
+		lot_name = 'my_lot'
+
+		class MyRunner(Runner):
+			lot = lot_name
+			tasks = {
+				task_name: task1
+			}
+			layout = {
+				'END': task_name
+			}
+
+		my_runner = MyRunner()
+
+		# run the runner
+		my_runner.run()
+		# check that the task was run
+		self.assertTrue(task1.num_runs == 1)
+
+		# run again
+		my_runner.run()
+		# this task should have been skipped due to existence of marker file
+		self.assertTrue(task1.num_runs == 1)
+
+		# remove the marker file
+		os.remove(
+			os.path.join(self.TEST_DIR, '%s_%s.marker' % (lot_name, task_name))
+		)
+
+		# run again
+		my_runner.run()
+		# the task should run again
+		self.assertTrue(task1.num_runs == 2)
+
+
+
 class TestCompoundRunner(TestCase):
 
 	def setUp(self):
@@ -238,10 +430,8 @@ class TestCompoundRunner(TestCase):
 		self.assertTrue(task6.was_run)
 		self.assertTrue(task7.was_run)
 
-		print os.listdir(TEST_DIR)
-
-		expected_files = ['1.a_test%d.txt' % d for d in range(4)]
-		expected_files.extend(['1.b_test%d.txt' % d for d in range(4,8)])
+		expected_files = ['a_test%d.txt' % d for d in range(4)]
+		expected_files.extend(['b_test%d.txt' % d for d in range(4,8)])
 		self.assertItemsEqual(expected_files, os.listdir(TEST_DIR))
 
 
@@ -324,8 +514,8 @@ class TestCompoundRunner(TestCase):
 			}
 
 		# make some resources so they won't be run
-		touch(os.path.join(TEST_DIR, '1.a_test0.txt'))
-		touch(os.path.join(TEST_DIR, '1.b_test6.txt'))
+		touch(os.path.join(TEST_DIR, 'a_test0.txt'))
+		touch(os.path.join(TEST_DIR, 'b_test6.txt'))
 
 		my_runner = MasterRunner()
 		my_runner.run()
@@ -343,10 +533,10 @@ class TestCompoundRunner(TestCase):
 		self.assertTrue(task7.was_run)
 
 		# all the files should exist at this point
-		expected_files = ['1.a_test%d.txt' % d for d in range(4)]
-		expected_files.extend(['1.b_test%d.txt' % d for d in range(6,8)])
+		expected_files = ['a_test%d.txt' % d for d in range(4)]
+		expected_files.extend(['b_test%d.txt' % d for d in range(6,8)])
 
-		# note, 1.b_test4.txt and 1.b_test5.txt never get made because
+		# note, b_test4.txt and b_test5.txt never get made because
 		# they aren't needed.
 
 		self.assertItemsEqual(expected_files, os.listdir(TEST_DIR))
@@ -516,7 +706,7 @@ class TestTask(TestCase):
 
 	def test_simple_task_many_resources_dict_run(self):
 		'''
-			Test that a task with many resources as a list, not 
+			Test that a task with many resources as a list,
 			gets run if at least one of them does not exist
 		'''
 		

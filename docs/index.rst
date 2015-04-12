@@ -351,6 +351,194 @@ or by passing ``inherit_lot=True``.  The latter causes the parent's lot name
 to be used as the child's rather than prepended to the the child's.
 
 
+Understanding run property propogation
+======================================
+One of the basic facilities that linguini provides is the propogation of 
+run properties (lot, as_pilot, clobber) down to the tasks and resources
+in the run.  This allows you to write code that is aware of these properties, 
+without having to repeatedly write logic that synchronizes the properties
+every time you create a new task or resource.
+
+Not all properties propogate in the same way.  For example, the lot property
+doesn't get propogated to sub-runs, as_pilot and clobber do.  This is because
+one of the main reasons for using subruns is to share upstream infrastructure
+between two runners, without duplicating the resources.  In other words,
+sub-runs do not inherit a lot from their parent, because they define their
+own lot, and that means they can be shared between different parent runs
+without duplicating resources.
+
+In short, propogation works like this:
+
+ - ``lot``: to ordinary tasks and resources, but not sub-runs
+ - ``as_pilot``: propogated to tasks and resources.
+ - ``clobber``: propogated to tasks and resources.
+
+
+Overriding property propogation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Sometimes you may want to be able to override the propogation of properties.
+For the case of ``as_pilot`` and ``clobber``, this can be done easily in 
+two ways.  If class level variables ``as_pilot`` or ``clobber`` exist on
+the sub-run, task, or resource, they will be used.  Alternatively, if these
+are passed as keyword arguments to the sub-run, task, or resource during 
+instantiation of them, then that value will be used.  For example::
+
+    class MyTask(Task):
+
+        as_pilot = False
+        outputs = None
+
+        def run():
+            do_stuff()
+
+    class MyRunner(Runner):
+        lot = 'my_lot'
+        tasks = {
+            'task1': MyTask()
+        }
+        layout = {
+            'END': 'task1'
+        }
+
+    MyRunner.run(as_pilot=True)
+
+In the above case, the runner has been run in pilot mode, but because the 
+task explicitly sets ``as_pilot = False`` in its class definition, that 
+task will still be run at full scale.
+
+Another way to achieve this is like so::
+
+    class MyTask(Task):
+
+        ouptuts = None
+
+        def run():
+            do_stuff()
+
+    class MyRunner(Runner):
+        lot = 'my_lot'
+        tasks = {
+            'task1': MyTask(as_pilot=False)
+        }
+        layout = {
+            'END': 'task1'
+        }
+
+    MyRunner.run(as_pilot=True)
+
+In this case, the runner has again be run in pilot mode.  This is not
+overriden in the task's class definition, but, within the runner, it is 
+overriden in the task's instantiation.  In the end, the same effect is 
+achieved: even though the runner is invoked with ``as_pilot=True``, it is
+overriden.
+
+If a property like ``as_pilot`` or ``clobber`` is set both in a tasks class
+definition, and passed as a keyword argumument during it's instantiation, it
+is the instantiation keyword argument that takes precedence.
+
+As far as ordinary tasks (not sub-runs) and resources are concerned, 
+propogation of the ``lot`` property works the same way.  However, the best 
+practice is that 
+``lot`` should never be set on a task or resource, either in its class 
+definition or invocation.  The purpose of Runners is to organize tasks into
+lots, in a visible way; setting the lot on a task would leads to the hidden
+creation of new lots.  If you find yourself wanting to override the 
+lot on a certain task or set of tasks, it suggests that it needs to be 
+encapsulated in a runner.
+
+
+Propogation of lot
+~~~~~~~~~~~~~~~~~~
+In cases where a parent runner has a sub-runner as a task, the ``lot`` 
+property will not be inherited by the sub-runner or its tasks and resources.
+This allows runners to share sub-runners in such a way that the sub-runners
+don't duplicate execution or resources.
+
+There are cases where this behavior isn't the desired one.  Suppose that 
+two runners share the same final set of analysis steps, but that they differ
+in the early tasks that generate the data to be analyzed.  It would be
+nice to package the analysis steps into a sub-runner, so that it could be 
+shared.  But obviously, the analysis steps do need to be duplicated for both
+parent runners, with resources kept separate.  In this case, the best practice
+is to set the lot of the shared runner by keyword argument during its 
+instantiation within each parent runner::
+
+    class SubRunner(Runner):
+        lot = 'sub'
+        tasks = {
+            'some_task': SomeTask()
+        }
+        layout = {
+            'END': 'some_task'
+        }
+
+    class ParentRunnerA(Runner):
+        lot = 'A'
+        tasks = {
+            'pt': PretretmentA(),
+            'analysis': SubRunner(lot='A')
+        }
+        layout = {
+            'END': 'analysis',
+            'analysis': 'pt'
+        }
+
+    class ParentRunnerB(Runner):
+        lot = 'B'
+        tasks = {
+            'pt': PretretmentB(),
+            'analysis': SubRunner(lot='B')
+        }
+        layout = {
+            'END': 'analysis',
+            'analysis': 'pt'
+        }
+        
+        
+Here, ``ParentRunnerA`` and ``ParentRunnerB`` both have the same final 
+analysis, and they use the same subrunner, but the subrunner is instantiated
+with different lots.  Here, the sub-run is given the parents lot.  
+Another way to look at it is that runners, by default, don't take the 
+lot of their parents, because they represent their own namespace, but they
+can be forced to inherit their parents lot.
+
+For most cases, the above technique could work.  But you way wish to set
+the sub-runners lot dynamically.  For example, here we have manually set the
+sub-runner's lot to be that of its parent's, but what if it's parent's lot were
+also to be inherited?  For maximum extensibility, you propogate the lot 
+by using dynamic setting of the task parameter by defining a ``_tasks()``
+method::
+
+    class SubRunner(Runner):
+        lot = 'sub'
+        tasks = {
+            'some_task': SomeTask()
+        }
+        layout = {
+            'END': 'some_task'
+        }
+
+    class ParentRunnerA(Runner):
+        lot = 'A'
+        def _tasks = {
+            'pt': PretretmentA(),
+            'analysis': SubRunner(lot=self.lot)
+        }
+        layout = {
+            'END': 'analysis',
+            'analysis': 'pt'
+        }
+
+This is the preferred way to propogate a lot to a sub-runner, because the
+sub-runner's lot is guaranteed to be equal to it's parent's without knowing
+the parent's lot ahead of time.
+
+
+
+
+
+
+
 Indices and tables
 ==================
 

@@ -1,0 +1,14 @@
+x make marker mixin and baseclass for Tasks
+x ensure that inheritance of lot names handled nicely by runners
+x add the clobber functionality
+
+x remove lot and as pilot from run -- use get_ready for all inheritance
+x don't pass until to get_ready
+
+test all the parameter setting stuff
+
+
+test that inheritance works for all attributes
+test that you can't set a non-stringlike to lot
+test that a run's outputs are equal to all it's 'END' task's outputs
+ditto for inputs

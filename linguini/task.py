@@ -1,4 +1,4 @@
-from resource import Resource 
+from resource import Resource, MarkerResource
 
 class TaskException(Exception):
 	pass
@@ -12,6 +12,12 @@ class Task(Resource):
 
 	def __init__(self, **kwargs):
 		
+		# certain properties, like as_pilot, or clobber, can be set via kwargs
+		# we do that here.  They get removed from the kwargs dict
+		self.try_popping_attribute(kwargs, 'lot')
+		self.try_popping_attribute(kwargs, 'as_pilot')
+		self.try_popping_attribute(kwargs, 'clobber')
+
 		# update any class-level parameters with those provided in constructor
 		self.parameters = kwargs
 
@@ -20,25 +26,37 @@ class Task(Resource):
 		self._hashable_parameters = tuple(sorted(self.parameters.items()))
 
 		# Ensure all parameters are hashable
-		if not all(
-			[isinstance(hash(v), int) for k,v in self._hashable_parameters]
-		):
+		try:
+			if not all(
+				[isinstance(hash(v), int) for k,v in self._hashable_parameters]
+			):
+				raise ValueError('values used in parameters must be hashable.')
+
+		except TypeError:
 			raise ValueError('values used in parameters must be hashable.')
 
 
-	def get_ready(self, lot, as_pilot):
 
-		super(Task,self).get_ready(lot, as_pilot)
+	def try_popping_attribute(self, kwargs, attr_name):
+		try:
+			setattr(self, attr_name, kwargs.pop(attr_name))
+		except KeyError:
+			pass
+
+
+	def get_ready(self, lot, as_pilot, name, clobber=False):
+
+		super(Task,self).get_ready(lot, as_pilot, name, clobber)
 
 		# Ready the inputs
 		self.input = self._inputs()
 		for input in self.get_all_inputs():
-			input.get_ready(lot, as_pilot)
+			input.get_ready(self.lot, self.as_pilot, self.name, self.clobber)
 
 		# Ready the outputs 
 		self.outputs = self._outputs()
 		for output in self.get_all_outputs():
-			output.get_ready(lot, as_pilot)
+			output.get_ready(self.lot, self.as_pilot, self.name, self.clobber)
 
 
 	def get_all_inputs(self):
@@ -70,21 +88,21 @@ class Task(Resource):
 			return []
 
 		if isinstance(self.outputs, Resource):
-			outputs = [self.outputs]
+			return [self.outputs]
 			
-		elif isinstance(self.outputs, dict):
-			outputs = self.outputs.values()
+		if isinstance(self.outputs, dict):
+			return self.outputs.values()
 
-		else:
-			outputs = self.outputs
+		if isinstance(self.outputs, tuple):
+			return list(self.outputs)
 
-		if not isinstance(outputs, (list, tuple)):
-			raise TaskException(
-				'outputs must be a Resource, or a list, tuple, or dict of '
-				'resources.'
-			)
+		if isinstance(self.outputs, list):
+			return self.outputs
 
-		return outputs
+		raise TaskException(
+			'outputs must be a Resource, or a list, tuple, or dict of '
+			'resources.'
+		)
 
 
 	def exists(self):
@@ -111,12 +129,17 @@ class Task(Resource):
 
 
 	def _run(self, lot=None, as_pilot=False):
-		self.get_ready(lot, as_pilot)
-		return self.run()
-
+		#self.get_ready(lot, as_pilot)
+		return_val = self.run()
+		self._after()
+		
 
 	def run(self):
 		raise NotImplementedError('You need to define run().')
+
+
+	def _after(self):
+		pass
 
 
 	def __hash__(self):
@@ -124,3 +147,30 @@ class Task(Resource):
 
 
 
+class MarkedTask(Task):
+
+	def get_ready(self, lot, as_pilot, name, clobber=False):
+		super(MarkedTask, self).get_ready(lot, as_pilot, name, clobber)
+
+		try:
+			path = self.marker_path
+		except AttributeError:
+			path = '.'
+
+		fname = self.name + '.marker'
+		self.marker = MarkerResource(path, fname)
+		self.marker.get_ready(lot, as_pilot, name, clobber)
+
+
+	def exists(self):
+		return self.marker.exists()
+
+
+	def _after(self):
+		super(MarkedTask, self)._after()
+		self.marker.mark()
+
+
+class SimpleTask(MarkedTask):
+	outputs = None
+	marker_path = './linguini_markers'

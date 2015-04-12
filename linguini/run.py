@@ -26,6 +26,13 @@ class Runner(Task):
 	lot = None
 
 
+	# setting these here makes the call to super.get_ready work, after which
+	# inputs and outputs are set to the source ind sink tasks' inputs and 
+	# outputs.  Any values actually set to these class variables would be 
+	# ignored
+	outputs = None
+	inputs = None
+
 	def _tasks(self):
 		return self.tasks
 
@@ -59,7 +66,7 @@ class Runner(Task):
 			)
 
 
-	def _until(self):
+	def _until_names(self):
 		'''
 			Get the names of the last tasks to be run.  Default is the task(s) 
 			marked in layout by the key 'END'; can be overridden by class 
@@ -72,7 +79,7 @@ class Runner(Task):
 		'''
 			Get the last tasks to be run.
 		'''
-		return [self.tasks[t] for t in self._until()]
+		return [self.tasks[t] for t in self._until_names()]
 
 
 	def get_all_outputs(self):
@@ -87,59 +94,52 @@ class Runner(Task):
 		)
 
 
-	def resolve_lot(self, lot=None):
-
-		# either lot must be in class definition or passed at run time.
-		if lot is None and self.lot is None:
-			raise RunnerException('the lot could not be resolved')
-
-		# if only one is defined, use it
-		if lot is None or self.lot is None:
-			return lot or self.lot
-		
-		# if both are defined, and aren't equal, concatenate them
-		if self.lot != lot:
-			return lot + '.' + self.lot
-
-		# otherwise they're identical, so don't concatenate
-		return lot
-
-
-
-	def get_ready(self, lot=None, as_pilot=False, until=None):
+	def get_ready(
+			self,
+			lot=None,
+			as_pilot=False,
+			name='main',
+			clobber=False
+		):
 
 		if self.is_ready():
 			return
 
-		self.lot = self.resolve_lot(lot)
+		# unlike other tasks, by default, runs do *not* inherit lot from parent
+		# runs, unless explicitly done at object instantiation.
+		# note that, at the time that get_ready is run, any lot value set 
+		# during instantiation will have already been set to self.lot
+		if not hasattr(self, 'lot') or self.lot is None:
+			raise RunnerException('No lot was given!')
 
-		# resolve as_pilot
-		if as_pilot is not None:
-			self.as_pilot = as_pilot
+		# resolve propogation of the run properties
+		self.resolve_attr('lot', lot)
+		self.resolve_attr('as_pilot', as_pilot, False)
+		self.resolve_attr('name', name)
+		self.resolve_attr('clobber', clobber)
 
-		elif not hasattr(self, 'as_pilot'):
-			self.as_pilot = False
-
-		# resolve until
-		if until is not None:
-			self.until = until
-
-		elif hasattr(self, '_until'):
-			self.until = self._until()
-
-		elif not hasattr(self, 'until'):
-			self.until = None
-
-		# resolve layout
-		self.layout = self._layout()
+		# make sure that the lot is string-like
+		if not isinstance(self.lot, basestring):
+			raise ValueError(
+				'`lot` must be an instance of basestr, like str or unicode.'
+			)
 
 		# resolve tasks
 		self.tasks = self._tasks()
 
-
 		# get all the tasks ready
-		for task in self.tasks.values():
-			task.get_ready(self.lot, as_pilot)
+		for task_name, task in self.tasks.iteritems():
+			task.get_ready(
+				lot=self.lot, as_pilot=as_pilot, name=task_name, 
+				clobber=clobber
+			)
+
+		# resolve layout
+		self.layout = self._layout()
+
+		# it isn't necessary to specify a run's outputs, because they are
+		# taken to be those of the END tasks
+		self.outputs = self.get_all_outputs()
 
 		# mark as ready
 		self._is_ready = True
@@ -168,23 +168,29 @@ class Runner(Task):
 		return scheduled
 
 
-	def _run(self, lot=None, as_pilot=False, until=None):
+	def _run(self, lot=None, as_pilot=False, until=None, clobber=None):
 
-		self.run(lot, as_pilot=as_pilot, until=until)
+		self.run(lot, as_pilot=as_pilot, until=until, clobber=clobber)
 
 
-	def run(self, lot=None, as_pilot=None, until=None):
+	def run(self, lot=None, as_pilot=None, until=None, clobber=False):
 
-		self.get_ready(lot, as_pilot, until)
+		self.get_ready(lot, as_pilot, 'main', clobber)
 
-		# ensure that self.lot is defined and is string-like
-		if self.lot is None:
-			raise RunnerException('You must specify a lot for your runner')
+		# resolve until
+		if until is not None:
+			self.until = until
+
+		elif not hasattr(self, 'until'):
+			self.until = None
+
+		elif hasattr(self, '_until'):
+			self.until = self._until()
 
 		# make sure that all the tasks are well-defined and actually get used
 		self.check_layout()
 
-		print 'Starting runner for lot %s.' % self.lot
+		#print 'Starting runner for lot %s.' % self.lot
 
 		# by default, run whatever is in 'END'
 		until = until or self.until
@@ -193,13 +199,10 @@ class Runner(Task):
 
 		schedule = self.recursively_schedule(until)
 
-		
-
 		# completely run the until_tasks
 		while len(schedule) > 0:
 			next_task_name = schedule.pop()
-			print ' - running %s.' % next_task_name
-			self.tasks[next_task_name]._run(self.lot, self.as_pilot)
-
+			#print ' - running %s.' % next_task_name
+			self.tasks[next_task_name]._run()
 
 

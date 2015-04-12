@@ -8,10 +8,37 @@ class ResourceException(Exception):
 
 class Resource(object):
 
-	def get_ready(self, lot, as_pilot):
 
-		self.lot = lot
-		self.as_pilot = as_pilot
+	def resolve_attr(self, attr_name, attr_val, default=None, raises=True):
+
+		if not hasattr(self, attr_name) or getattr(self, attr_name) is None:
+			setattr(self, attr_name, attr_val)
+
+		if getattr(self, attr_name) is None:
+			setattr(self, attr_name, default)
+
+		if getattr(self, attr_name) is None and raises:
+			raise ResourceException('No value found for %s.' % attr_name)
+
+		return getattr(self, attr_name)
+
+
+
+		
+	def get_ready(self, lot, as_pilot, name, clobber):
+
+		# resolve propogation of the run properties
+		self.resolve_attr('lot', lot)
+		self.resolve_attr('as_pilot', as_pilot, False)
+		self.resolve_attr('name', name)
+		self.resolve_attr('clobber', clobber)
+
+		# make sure that the lot is string-like
+		if not isinstance(self.lot, basestring):
+			raise ValueError(
+				'`lot` must be an instance of basestr, like str or unicode.'
+			)
+
 		self._is_ready = True
 
 
@@ -79,6 +106,10 @@ class FileResource(Resource):
 		return open(self.get_path(), flags)
 
 
+class MarkerResource(FileResource):
+	def mark(self):
+		self.open('a').write('%s\n' % str(datetime.now()))
+
 
 class IncrementalFileResource(object):
 	'''
@@ -114,4 +145,53 @@ class IncrementalFileResource(object):
 
 
 
+class FolderResource(FileResource):
+	'''
+		Creates (if necessary) a folder that is namepsaced to the lot, 
+		and allows reading and writing files there.  File names are not
+		namespaced (because the folder is).
+	'''
+
+	def get_fname(self):
+		return os.path.join(self.get_path(), fname)
+
+	def open(self, fname, mode):
+
+		# check if the folder exists yet, make it if not 
+		if os.isdir(self.get_path()):
+			pass
+
+		# if a file (rather than folder) exists, it's an error
+		elif os.exists(self.get_path()):
+			raise IOError(
+				'FolderResource: the given path corresponds to an existing '
+				'*file*.  I cannot create a directory here: %s' 
+				% self.get_path()
+			)
+
+		# if not, make the folder
+		else:
+			os.mkdir(self.get_path())
+
+		# check if the specific file exists (as a folder or file)
+		if os.isdir(self.get_fname()):
+			raise IOError(
+				'FolderResource: a file or folder exists there. '
+				'I can\'t make a file: %s' % self.get_fname()
+			)
+
+		# if we're opening in write mode, don't overwrite an existing file
+		if 'w' in mode and os.isfile(self.get_fname()):
+			raise IOError(
+				'FolderResource: a file already exists there. '
+				'I don not overwrite by default: %s' % self.get_fname()
+			)
+
+		# if all is good, open and yield the file resource
+		return open(self.get_fname(), mode)
+
+
+	#TODO: defined exists
+	def exists(self):
+		pass
 

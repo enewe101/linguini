@@ -1,0 +1,9 @@
+defined
+instantiated
+run 
+inherited
+
+clobber(false): invoked > defined > inherited 
+lot(required): instantiated > defined > run / inherited (only if others are None
+as_pilot(false): invoked > defined > inherited/run
+until(None): run > invoked > defined(dynamic) [not inherited] 
