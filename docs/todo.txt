@@ -1,4 +1,11 @@
+LEFT OFF:
+	- still testing inheritance of clobber
+	- overhauled inheritance mechanism, but need to test inheritance
+		of pilot, clobber, and lot
+
+- fix resolution of until
 - finish adding clobber keyword functionality
+- ensure that resources don't overwrite files unless in clobber mode
 
 x Runners have a simpler syntax for specifying tasks and dependencies.
 

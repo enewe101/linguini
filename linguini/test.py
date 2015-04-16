@@ -1406,6 +1406,139 @@ class TestStaticRunner(TestCase):
 			os.path.join(TEST_DIR, '%s_pilot_out_B.txt'%LOT_NAME)))
 
 
+class TestClobberInheritance(TestCase):
+
+	def setUp(self):
+		os.mkdir(TEST_DIR)
+
+	def tearDown(self):
+		shutil.rmtree(TEST_DIR)
+		if os.path.exists('./linguini_markers'):
+			shutil.rmtree('./linguini_markers')
+
+	
+	def test_resource_inheritance(self):
+
+		# a Resource's clobber flag is set by get_ready
+		my_file = File('.', 'file.txt')
+		my_file.get_ready(lot='my_lot', pilot=False, name='name', 
+			clobber=True)
+		self.assertTrue(my_file.get_clobber())
+
+		# it's overriden by instantiation keyword argument
+		self.assertTrue(File('.', 'file.txt', clobber=True).get_clobber())
+
+		# instantiation gets the last word
+		my_file = File('.', 'file.txt', clobber=True)
+		my_file.get_ready(lot='my_lot', pilot=False, name='name', 
+			clobber=False)
+		self.assertTrue(my_file.get_clobber())
+
+		# instantiation gets the last word
+		my_file = File('.', 'file.txt', clobber=False)
+		my_file.get_ready(lot='my_lot', pilot=False, name='name', 
+			clobber=True)
+		self.assertFalse(my_file.get_clobber())
+
+
+		class MyFile(File):
+			clobber = True
+
+		# this resource clobbers by default
+		self.assertTrue(MyFile('.', 'file.txt').get_clobber())
+
+		# that behavior is overriden by instantiation keyword argument
+		self.assertFalse(MyFile('.', 'file.txt', clobber=False).get_clobber())
+
+		# it's not overridden by argument passed to get_ready
+		my_file = MyFile('.', 'file.txt')
+		my_file.get_ready(lot='my_lot', pilot=False, name='name', 
+			clobber=False)
+		self.assertTrue(my_file.get_clobber())
+
+
+		class MyFile(File):
+			clobber = False
+
+		# this resource does not clobber by default
+		self.assertFalse(MyFile('.', 'file.txt').get_clobber())
+
+		# that behavior is overriden by instantiation keyword argument
+		self.assertTrue(MyFile('.', 'file.txt', clobber=True).get_clobber())
+
+		# it's not overridden by argument passed to get_ready
+		my_file = MyFile('.', 'file.txt')
+		my_file.get_ready(lot='my_lot', pilot=False, name='name', 
+			clobber=True)
+		self.assertFalse(my_file.get_clobber())
+
+
+	def test_task_inheritance(self):
+
+		LOT_NAME = 'my_lot'
+
+		open(os.path.join(TEST_DIR, '%s_a.txt'%LOT_NAME), 'w').write('no')
+		open(os.path.join(TEST_DIR, '%s_b.txt'%LOT_NAME), 'w').write('no')
+
+		class MyTask(SimpleTask):
+			outputs = {
+				'A': File(TEST_DIR, 'a.txt'),
+				'B': File(TEST_DIR, 'b.txt')
+			}
+			def run(self):
+				self.outputs['A'].open('w').write('yes')
+				self.outputs['B'].open('w').write('yes')
+
+		task = MyTask()
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {
+				'task1' : task
+			}
+
+
+		# by default task has clobber = False 
+		with self.assertRaises(IOError):
+			MyRunner().run()
+
+		self.assertFalse(task.get_clobber())
+		self.assertEqual(
+			'no', 
+			open(os.path.join(TEST_DIR, '%s_a.txt'%LOT_NAME), 'r').read()
+		)
+		self.assertEqual(
+			'no', 
+			open(os.path.join(TEST_DIR, '%s_b.txt'%LOT_NAME), 'r').read()
+		)
+
+		# contents should not have changed, but reset for certainty
+		open(os.path.join(TEST_DIR, '%s_a.txt'%LOT_NAME), 'w').write('no')
+		open(os.path.join(TEST_DIR, '%s_b.txt'%LOT_NAME), 'w').write('no')
+
+		# this gets overidden by keyword argument to runner
+		MyRunner().run(clobber=True)
+
+		self.assertTrue(task.get_clobber())
+		self.assertEqual(
+			'yes', 
+			open(os.path.join(TEST_DIR, '%s_a.txt'%LOT_NAME), 'r').read()
+		)
+		self.assertEqual(
+			'yes', 
+			open(os.path.join(TEST_DIR, '%s_b.txt'%LOT_NAME), 'r').read()
+		)
+
+
+		task = MyTask(clobber=True)
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {
+				'task1' : task
+			}
+
+
 
 
 if __name__ == '__main__':

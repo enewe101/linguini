@@ -19,67 +19,21 @@ class Runner(Task):
 
 	# The null runner has no tasks, but is valid
 	tasks = {}
-	layout = {
-		'END':[]
-	}
 	until = None
 	lot = None
-
-
-	# setting these here makes the call to super.get_ready work, after which
-	# inputs and outputs are set to the source ind sink tasks' inputs and 
-	# outputs.  Any values actually set to these class variables would be 
-	# ignored
 	outputs = None
 	inputs = None
 
 	def _tasks(self):
 		return self.tasks
 
+
 	def _layout(self):
 		return self.layout
 
+
 	def _until(self):
 		return self.until
-
-
-	#def check_layout(self):
-	#	# ensure that all tasks in layout are defined in tasks
-	#	laid_out_tasks = set([t for t in self.layout if t is not 'END'])
-
-	#	missing = [
-	#		t for t in self.layout 
-	#		if t not in self.tasks and t is not 'END'
-	#	]
-	#	if len(missing)>0:
-	#		raise RunnerException(
-	#			'The following tasks were defined in the layout, but are '
-	#			'not defined in the tasks: %s' % ', '.join(missing)
-	#		)
-
-	#	unused = [t for t in self.tasks if t not in self.layout]
-	#	if len(missing)>0:
-	#		raise RunnerException(
-	#			'Warning, the following tasks are defined, but not included '
-	#			'in the layout (they will never be run): %s'
-	#			% ', '.join(unused)
-	#		)
-
-
-	#def _until_names(self):
-	#	'''
-	#		Get the names of the last tasks to be run.  Default is the task(s) 
-	#		marked in layout by the key 'END'; can be overridden by class 
-	#		variable.
-	#	'''
-	#	return as_list(self.until or self.layout['END'])
-
-
-	#def _until_tasks(self):
-	#	'''
-	#		Get the last tasks to be run.
-	#	'''
-	#	return [self.get_task(t) for t in self._until_names()]
 
 
 	def get_all_outputs(self):
@@ -96,6 +50,30 @@ class Runner(Task):
 	def get_task(self, task_name):
 		return as_list(self.tasks[task_name])[0]
 
+	def get_lot(self):
+
+		# if self.share is True, use the lot from the class definition
+		if self.share or self.static:
+			if self.lot is None:
+				raise RunnerException(
+					'lot is not defined in %s' % self.__class__.__name__)
+			return self.lot
+
+		# normally, inherit lot
+		if self.inherited_lot is not None:
+			return self.inherited_lot
+
+		# otherwise instantiated lot takes precedence
+		if self.instance_lot is not None:
+			return self.instance_lot
+
+		# lastly, use the lot in the class definition
+		if self.lot is None:
+			raise RunnerException(
+				'lot is not defined in %s' % self.__class__.__name__)
+		return self.lot
+
+
 	def get_ready(
 			self,
 			lot=None,
@@ -107,22 +85,16 @@ class Runner(Task):
 		if self.is_ready():
 			return
 
+		self.inherited_lot = lot
+		self.inherited_pilot = pilot
+		self.inherited_clobber = clobber
 
-		# sub-runners inherit their parent runners lot name here.
-		# ordinary runners 'inherit' lot by keyword argument to run() here.
-		# If runner instantiated with share=True, lot is not inherited
-		if not self.share and lot is not None:
-			self.lot = lot
+		self.name = name
 
-		# if ignore pilot is true, then pilot is forced false.  Otherwise
-		# it is inherited
-		if self.ignore_pilot:
-			self.pilot = False
-		else:
-			self.resolve_attr('pilot', pilot, False)
-
-		self.resolve_attr('name', name)
-		self.resolve_attr('clobber', clobber)
+		# at this point we should have a valid lot
+		if not isinstance(self.get_lot(), basestring):
+			raise RunnerException(
+				'no lot defined in %s' % self.__class__.__name__)
 
 		# resolve tasks
 		self.tasks = self._tasks()
@@ -133,12 +105,9 @@ class Runner(Task):
 			task = as_list(self.tasks[task_name])[0]
 
 			task.get_ready(
-				lot=self.lot, pilot=self.pilot, name=task_name, 
-				clobber=clobber
+				lot=self.get_lot(), pilot=self.get_pilot(), name=task_name, 
+				clobber=self.get_clobber()
 			)
-
-		# resolve layout
-		self.layout = self._layout()
 
 		# it isn't necessary to specify a run's outputs, because they are
 		# taken to be those of the END tasks
@@ -151,7 +120,11 @@ class Runner(Task):
 	def recursively_schedule(self, task_names):
 		'''
 			accepts the name of a task, or an iterable thereof, and schedules
-			those which are not yet done.
+			those among them which are not done, as well as their 
+			not-done-dependencies.  Avoids double-scheduling tasks.
+
+			if self.clobber is True, then it schedules tasks even if already 
+			done.
 		'''
 
 		task_names = as_list(task_names)
@@ -163,7 +136,7 @@ class Runner(Task):
 			task = task_def[0]
 			dependencies = task_def[1:]
 
-			if not task.exists():
+			if not task.exists() or self.get_clobber():
 
 				# add tasks to the schedule, without permitting duplicates
 				scheduled.add(task_name)
@@ -285,10 +258,6 @@ class Runner(Task):
 			clobber=clobber
 		)
 
-		if self.lot is None:
-			raise RunnerException(
-				'Runner has no lot: %s' % self.__class__.__name__)
-
 		# resolve until
 		if until is not None:
 			self.until = until
@@ -299,7 +268,7 @@ class Runner(Task):
 		elif hasattr(self, '_until'):
 			self.until = self._until()
 
-		#print 'Starting runner for lot %s.' % self.lot
+		#print 'Starting runner for lot %s.' % self.get_lot()
 
 		# by default, run whatever is in 'END'
 		until = until or self.until

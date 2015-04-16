@@ -11,6 +11,13 @@ class Resource(object):
 
 	def __init__(self, **kwargs):
 		self.resolve_static(**kwargs)
+		self.resolve_inherited(**kwargs)
+
+
+	def resolve_inherited(self, **kwargs):
+		self.instance_lot = kwargs.pop('lot', None)
+		self.instance_pilot = kwargs.pop('pilot', None)
+		self.instance_clobber = kwargs.pop('clobber', None)
 
 
 	def resolve_static(self, **kwargs):
@@ -19,49 +26,19 @@ class Resource(object):
 		self.share = kwargs.pop('share', False)
 		self.ignore_pilot = kwargs.pop('ignore_pilot', False)
 
-		if self.static:
-			self.share = True
-			self.ignore_pilot = True
 
-
-	def resolve_attr(self, attr_name, attr_val, default=None, raises=True):
-
-		# self.attr_name takes precedence, but if unset or none, use attr_val 
-		if not hasattr(self, attr_name) or getattr(self, attr_name) is None:
-			setattr(self, attr_name, attr_val)
-
-		# if attr_val is None, try using the default value
-		if getattr(self, attr_name) is None:
-			setattr(self, attr_name, default)
-
-		# if the attribute is still None, maybe raise exception
-		if getattr(self, attr_name) is None and raises:
-			raise ResourceException('No value found for %s.' % attr_name)
-
-		# attribute value was set to self.attr_name, but we also return it
-		return getattr(self, attr_name)
-
-		
 	def get_ready(self, lot, pilot, name, clobber):
 
 		# resolve propogation of the run properties
-		#
-		# lot can be none now, because of how static / share works
-		self.resolve_attr('lot', lot, raises=False)
-		self.resolve_attr('pilot', pilot, False)
-
-		self.resolve_attr('name', name)
-		self.resolve_attr('clobber', clobber)
-
-		# enforce `ignore_pilot` and `share`, by overriding lot and pilot
-		if self.ignore_pilot:
-			self.pilot = False
-
-		if self.share:
-			self.lot = None
+		self.inherited_lot = lot
+		self.inherited_pilot = pilot
+		self.inherited_clobber = clobber
+		self.name = name
 
 		# make sure that the lot is string-like or None
-		if not isinstance(self.lot, basestring) and self.lot is not None :
+		lot_is_not_string = not isinstance(self.get_lot(), basestring)
+		lot_is_not_none = self.get_lot() is not None
+		if lot_is_not_string and lot_is_not_none:
 			raise ValueError(
 				'`lot` must be an instance of basestr, like str or unicode.'
 			)
@@ -74,6 +51,54 @@ class Resource(object):
 			return self._is_ready
 		except AttributeError:
 			return False
+
+
+	def get_clobber(self):
+		if self.instance_clobber is not None:
+			return self.instance_clobber
+
+		if hasattr(self, 'clobber') and self.clobber is not None:
+			return self.clobber
+
+		if self.inherited_clobber is not None:
+			return self.inherited_clobber
+
+		raise ResourceException(
+			'could not resolve clobber in %s' % self.__class__.__name__)
+
+
+	def get_pilot(self):
+		if self.ignore_pilot or self.static:
+			return False
+
+		if self.instance_pilot is not None:
+			return self.instance_pilot
+
+		if hasattr(self, 'pilot') and self.pilot is not None:
+			return self.pilot
+
+		if self.inherited_pilot is not None:
+			return self.inherited_pilot
+
+		raise ResourceException(
+			'could not resolve pilot in %s' % self.__class__.__name__)
+
+
+	def get_lot(self):
+		if self.share or self.static:
+			return None
+
+		if self.instance_lot is not None:
+			return self.instance_lot
+
+		if hasattr(self, 'lot') and self.lot is not None:
+			return self.lot
+
+		if self.inherited_lot is not None:
+			return self.inherited_lot
+
+		return None
+
 
 
 	def exists(self):
@@ -97,8 +122,8 @@ class File(Resource):
 			raise ResourceException('Resource is not ready.')
 
 		fname = (
-			(('%s_' % self.lot) if self.lot is not None else '')
-			+ ('pilot_' if self.pilot else '')
+			(('%s_' % self.get_lot()) if self.get_lot() is not None else '')
+			+ ('pilot_' if self.get_pilot() else '')
 			+ self.fname
 		)
 		return os.path.join(self.path, fname)
@@ -114,10 +139,14 @@ class File(Resource):
 
 			# if writing, check whether the file exists
 			if os.path.isfile(self.get_path()):
-				raise IOError(
-					'File: by default, I refuse to overwrite files. '
-					+ self.get_path()
-				)
+				if self.get_clobber():
+					print '\t INFO: clobbered %s' % self.get_path()
+				else:
+					raise IOError(
+						'File: by default, I refuse to overwrite files. '
+						+ self.get_path()
+					)
+
 
 			# check if the directory exists, if not make it
 			if not os.path.exists(self.path):
@@ -220,6 +249,9 @@ class Folder(File):
 
 		# check if the specific file exists (as a folder or file)
 		if os.path.isdir(self.get_fname(fname)):
+			if self.get_clobber():
+				print '\tINFO: clobbered %s' % self.get_fname(fname)
+
 			raise IOError(
 				'Folder: a file or folder exists there. '
 				'I can\'t make a file: %s' % self.get_fname(fname)

@@ -12,17 +12,6 @@ class Task(Resource):
 
 	def __init__(self, **kwargs):
 		
-		# certain properties, like pilot, or clobber, can be set via kwargs
-		# we do that here.  They get removed from the kwargs dict
-		self.try_popping_attribute(kwargs, 'lot')
-		self.try_popping_attribute(kwargs, 'pilot')
-		self.try_popping_attribute(kwargs, 'clobber')
-
-		## based on settings of `share`, `static`, and `ignore_pilot`
-		#self.share = kwargs.pop('share', False)
-		#self.ignore_pilot = kwargs.pop('ignore_pilot', False)
-		#self.static = kwargs.pop('static', False)
-
 		# update any class-level parameters with those provided in constructor
 		self.parameters = kwargs
 
@@ -44,28 +33,21 @@ class Task(Resource):
 
 
 
-
-	def try_popping_attribute(self, kwargs, attr_name):
-		try:
-			setattr(self, attr_name, kwargs.pop(attr_name))
-		except KeyError:
-			pass
-
-
 	def get_ready(self, lot, pilot, name, clobber=False):
 
 		super(Task,self).get_ready(lot, pilot, name, clobber)
-		# note that this will enforce the `share` and `ignore_pilot` settings
 
 		# Ready the inputs
 		self.input = self._inputs()
 		for input in self.get_all_inputs():
-			input.get_ready(self.lot, self.pilot, self.name, self.clobber)
+			input.get_ready(
+				self.get_lot(), self.get_pilot(), 'poop', self.get_clobber())
 
 		# Ready the outputs 
 		self.outputs = self._outputs()
 		for output in self.get_all_outputs():
-			output.get_ready(self.lot, self.pilot, self.name, self.clobber)
+			output.get_ready(
+				self.get_lot(), self.get_pilot(), 'poop', self.get_clobber())
 
 
 	def get_all_inputs(self):
@@ -138,7 +120,6 @@ class Task(Resource):
 
 
 	def _run(self, lot=None, pilot=False):
-		#self.get_ready(lot, pilot)
 		return_val = self.run()
 		self._after()
 		
