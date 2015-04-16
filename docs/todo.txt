@@ -1,3 +1,35 @@
+- finish adding clobber keyword functionality
+x Runners have a simpler syntax for specifying tasks and dependencies.
+
+x Runners, Tasks, and resources accept static, share, ignore_pilot
+	- share, ignore_pilot, and static
+		- static = share + ignore_pilot
+		- these can be specified for runners, tasks, and resources.
+
+	- for runners, share means it uses its own lot, and doesn't inherit.
+	- for tasks share means that all the resources are run with lot=None
+	- for resources, share=True causes the lot to be None
+
+	- for runners, ignore_pilot means that pilot=False, even if the parent
+		has pilot=True
+	- for tasks, ignore_pilot means that pilot=False, even if the parent
+		invoked pilot=True
+	- for resources, ignore_pilot means that pilot=False, even if the task
+		was invoked with pilot=True
+
+- Consider making default Task:
+	- use marker files
+	- not require outputs / inputs
+
+- Rename FileResource to File
+- Rename FolderResource to Folder 
+- Rename as_pilot to pilot
+
+- test that cyclical dependencies are caught
+- test that non-existent dependencies are caught
+
+
+
 x make marker mixin and baseclass for Tasks
 x ensure that inheritance of lot names handled nicely by runners
 x add the clobber functionality

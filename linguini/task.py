@@ -18,6 +18,11 @@ class Task(Resource):
 		self.try_popping_attribute(kwargs, 'as_pilot')
 		self.try_popping_attribute(kwargs, 'clobber')
 
+		## based on settings of `share`, `static`, and `ignore_pilot`
+		#self.share = kwargs.pop('share', False)
+		#self.ignore_pilot = kwargs.pop('ignore_pilot', False)
+		#self.static = kwargs.pop('static', False)
+
 		# update any class-level parameters with those provided in constructor
 		self.parameters = kwargs
 
@@ -35,6 +40,9 @@ class Task(Resource):
 		except TypeError:
 			raise ValueError('values used in parameters must be hashable.')
 
+		super(Task, self).__init__(**kwargs)
+
+
 
 
 	def try_popping_attribute(self, kwargs, attr_name):
@@ -47,6 +55,7 @@ class Task(Resource):
 	def get_ready(self, lot, as_pilot, name, clobber=False):
 
 		super(Task,self).get_ready(lot, as_pilot, name, clobber)
+		# note that this will enforce the `share` and `ignore_pilot` settings
 
 		# Ready the inputs
 		self.input = self._inputs()

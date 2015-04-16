@@ -3,7 +3,7 @@ import unittest
 from unittest import TestCase
 from run import Runner, RunnerException
 from task import Task, TaskException, MarkedTask, SimpleTask
-from resource import Resource, FileResource, FolderResource
+from resource import Resource, File, Folder
 import os
 
 
@@ -30,7 +30,7 @@ class TestFolderResource(TestCase):
 		lot_name = 'my_lot'
 
 		class MyTask(SimpleTask):
-			outputs = FolderResource(TEST_DIR, dir_name)
+			outputs = Folder(TEST_DIR, dir_name)
 			was_run = False
 			def run(self):
 				self.was_run = True
@@ -40,9 +40,6 @@ class TestFolderResource(TestCase):
 			lot = lot_name
 			tasks = {
 				'task': MyTask()
-			}
-			layout = {
-				'END': 'task'
 			}
 
 		MyRunner().run()
@@ -89,13 +86,8 @@ class TestRunner(TestCase):
 			tasks = {
 				'task0':task0,
 				'task1':task1,
-				'task2':task2,
-				'task3':task3
-			}
-			layout = {
-				'END': 'task3',
-				'task3': 'task2',
-				'task2': ['task1','task0']
+				'task2': (task2, 'task1', 'task0'),
+				'task3': (task3, 'task2')
 			}
 
 		my_runner = MyRunner()
@@ -128,13 +120,8 @@ class TestRunner(TestCase):
 			tasks = {
 				'task0':task0,
 				'task1':task1,
-				'task2':task2,
-				'task3':task3
-			}
-			layout = {
-				'END': 'task3',
-				'task3': 'task2',
-				'task2': ['task1','task0']
+				'task2': (task2, 'task1', 'task0'),
+				'task3': (task3, 'task2')
 			}
 
 		my_runner = MyRunner()
@@ -166,13 +153,8 @@ class TestRunner(TestCase):
 			tasks = {
 				'task0':task0,
 				'task1':task1,
-				'task2':task2,
-				'task3':task3
-			}
-			layout = {
-				'END': 'task3',
-				'task3': 'task2',
-				'task2': ['task1','task0']
+				'task2': (task2, 'task1', 'task0'),
+				'task3': (task3, 'task2')
 			}
 
 		my_runner = MyRunner()
@@ -209,9 +191,6 @@ class TestMarkerTask(TestCase):
 			lot = lot_name
 			tasks = {
 				task_name: task1
-			}
-			layout = {
-				'END': task_name
 			}
 
 		my_runner = MyRunner()
@@ -283,9 +262,6 @@ class TestMarkerTask(TestCase):
 			tasks = {
 				task_name: task1
 			}
-			layout = {
-				'END': task_name
-			}
 
 		my_runner = MyRunner()
 
@@ -345,9 +321,6 @@ class TestSimpleTask(TestCase):
 			tasks = {
 				task_name: task1
 			}
-			layout = {
-				'END': task_name
-			}
 
 		my_runner = MyRunner()
 
@@ -390,7 +363,7 @@ class TestCompoundRunner(TestCase):
 
 			def _outputs(self):
 				fname = 'test%d.txt' % self.parameters['file_num']
-				return FileResource(TEST_DIR, fname)
+				return File(TEST_DIR, fname)
 
 			was_run = False		# Track whether the task was run
 			def exists(self):	# ensures the task will not be skipped
@@ -417,13 +390,8 @@ class TestCompoundRunner(TestCase):
 			tasks = {
 				'task0':task0,
 				'task1':task1,
-				'task2':task2,
-				'task3':task3
-			}
-			layout = {
-				'END': 'task3',
-				'task3': 'task2',
-				'task2': ['task1','task0']
+				'task2': (task2, 'task1', 'task0'),
+				'task3': (task3, 'task2')
 			}
 			def exists(self):
 				return False
@@ -434,13 +402,8 @@ class TestCompoundRunner(TestCase):
 			tasks = {
 				'task0':task4,
 				'task1':task5,
-				'task2':task6,
-				'task3':task7
-			}
-			layout = {
-				'END': 'task3',
-				'task3': 'task2',
-				'task2': ['task1','task0']
+				'task2': (task6, 'task1', 'task0'),
+				'task3': (task7, 'task2')
 			}
 			def exists(self):
 				return False
@@ -449,11 +412,7 @@ class TestCompoundRunner(TestCase):
 			lot = '1'
 			tasks = {
 				'run0': MyRunner(),
-				'run1': MoRunner()
-			}
-			layout = {
-				'END': 'run1',
-				'run1': 'run0'
+				'run1': (MoRunner(), 'run0'),
 			}
 
 		my_runner = MasterRunner()
@@ -468,8 +427,8 @@ class TestCompoundRunner(TestCase):
 		self.assertTrue(task6.was_run)
 		self.assertTrue(task7.was_run)
 
-		expected_files = ['a_test%d.txt' % d for d in range(4)]
-		expected_files.extend(['b_test%d.txt' % d for d in range(4,8)])
+		# the lot of master runner is inherited by both sub-runners
+		expected_files = ['1_test%d.txt' % d for d in range(8)]
 		self.assertItemsEqual(expected_files, os.listdir(TEST_DIR))
 
 
@@ -483,7 +442,7 @@ class TestCompoundRunner(TestCase):
 
 			def _outputs(self):
 				fname = 'test%d.txt' % self.parameters['file_num']
-				return FileResource(TEST_DIR, fname)
+				return File(TEST_DIR, fname)
 
 			was_run = False		# Track whether the task was run
 
@@ -508,13 +467,8 @@ class TestCompoundRunner(TestCase):
 			tasks = {
 				'task0':task0,
 				'task1':task1,
-				'task2':task2,
-				'task3':task3
-			}
-			layout = {
-				'END': 'task3',
-				'task3': 'task2',
-				'task2': ['task1','task0']
+				'task2': (task2, 'task1', 'task0'),
+				'task3': (task3, 'task2')
 			}
 			def exists(self):
 				return False
@@ -525,13 +479,8 @@ class TestCompoundRunner(TestCase):
 			tasks = {
 				'task0':task4,
 				'task1':task5,
-				'task2':task6,
-				'task3':task7
-			}
-			layout = {
-				'END': 'task3',
-				'task3': 'task2',
-				'task2': ['task1','task0']
+				'task2': (task6, 'task1', 'task0'),
+				'task3': (task7, 'task2')
 			}
 			def exists(self):
 				return False
@@ -544,35 +493,30 @@ class TestCompoundRunner(TestCase):
 			lot = '1'
 			tasks = {
 				'run0': my_runner,
-				'run1': mo_runner
-			}
-			layout = {
-				'END': 'run1',
-				'run1': 'run0'
+				'run1': (mo_runner, 'run0')
 			}
 
 		# make some resources so they won't be run
-		touch(os.path.join(TEST_DIR, 'a_test0.txt'))
-		touch(os.path.join(TEST_DIR, 'b_test6.txt'))
+		touch(os.path.join(TEST_DIR, '1_test0.txt'))
+		touch(os.path.join(TEST_DIR, '1_test6.txt'))
 
 		my_runner = MasterRunner()
 		my_runner.run()
 
 		# these tasks should not have been run
 		self.assertFalse(task0.was_run)
-		self.assertFalse(task4.was_run)
-		self.assertFalse(task5.was_run)
 		self.assertFalse(task6.was_run)
 
 		# these tasks should have been run
 		self.assertTrue(task1.was_run)
 		self.assertTrue(task2.was_run)
 		self.assertTrue(task3.was_run)
+		self.assertTrue(task4.was_run)
+		self.assertTrue(task5.was_run)
 		self.assertTrue(task7.was_run)
 
 		# all the files should exist at this point
-		expected_files = ['a_test%d.txt' % d for d in range(4)]
-		expected_files.extend(['b_test%d.txt' % d for d in range(6,8)])
+		expected_files = ['1_test%d.txt' % d for d in range(8)]
 
 		# note, b_test4.txt and b_test5.txt never get made because
 		# they aren't needed.
@@ -604,7 +548,6 @@ class TestResource(TestCase):
 		class MyRunner(Runner):
 			lot = 'my_lot'
 			tasks = {'my_task':MyTask()}
-			layout = {'END':'my_task'}
 
 		runner = MyRunner()
 		with self.assertRaises(NotImplementedError):
@@ -630,7 +573,6 @@ class TestResource(TestCase):
 		class MyRunner(Runner):
 			lot = 'my_lot'
 			tasks = {'my_task':MyTask()}
-			layout = {'END':'my_task'}
 
 		runner = MyRunner()
 		runner.run()
@@ -649,7 +591,6 @@ class TestTask(TestCase):
 		class MyRunner(Runner):
 			lot = 'my_lot'
 			tasks = {'my_task':MyTask()}
-			layout = {'END':'my_task'}
 
 		runner = MyRunner()
 
@@ -673,7 +614,6 @@ class TestTask(TestCase):
 		class MyRunner(Runner):
 			lot = 'my_lot'
 			tasks = {'my_task':MyTask()}
-			layout = {'END':'my_task'}
 
 		runner = MyRunner()
 
@@ -703,7 +643,6 @@ class TestTask(TestCase):
 		class MyRunner(Runner):
 			lot = 'my_lot'
 			tasks = {'my_task':my_task}
-			layout = {'END':'my_task'}
 
 		runner = MyRunner()
 		runner.run()
@@ -733,7 +672,6 @@ class TestTask(TestCase):
 		class MyRunner(Runner):
 			lot = 'my_lot'
 			tasks = {'my_task':my_task}
-			layout = {'END':'my_task'}
 
 		runner = MyRunner()
 		runner.run()
@@ -773,7 +711,6 @@ class TestTask(TestCase):
 		class MyRunner(Runner):
 			lot = 'my_lot'
 			tasks = {'my_task':my_task}
-			layout = {'END':'my_task'}
 
 		runner = MyRunner()
 		runner.run()
@@ -808,7 +745,6 @@ class TestTask(TestCase):
 		class MyRunner(Runner):
 			lot = 'my_lot'
 			tasks = {'my_task':my_task}
-			layout = {'END':'my_task'}
 
 		runner = MyRunner()
 		runner.run()
@@ -839,7 +775,6 @@ class TestTask(TestCase):
 		class MyRunner(Runner):
 			lot = 'my_lot'
 			tasks = {'my_task':my_task}
-			layout = {'END':'my_task'}
 
 		runner = MyRunner()
 		runner.run()
@@ -875,13 +810,506 @@ class TestTask(TestCase):
 		class MyRunner(Runner):
 			lot = 'my_lot'
 			tasks = {'my_task':my_task}
-			layout = {'END':'my_task'}
 
 		runner = MyRunner()
 		runner.run()
 
 		self.assertTrue(my_task.was_run)
 
+
+class TestStatic(TestCase):
+
+	def setUp(self):
+		os.mkdir(TEST_DIR)
+
+	def tearDown(self):
+		shutil.rmtree(TEST_DIR)
+		if os.path.exists('./linguini_markers'):
+			shutil.rmtree('./linguini_markers')
+
+
+	def test_ignore_pilot_resource(self):
+		'''
+			Tests that, when a resource is invoked with the keyword argument
+			ignore_pilot=True, it will not put 'pilot_' in front of its 
+			file names.
+		'''
+
+		LOT_NAME = 'my_lot'
+
+		# make a files to be read, one prepends as_pilot, the other doesn't
+		open(os.path.join(TEST_DIR, '%s_in_A.txt'%LOT_NAME), 'w').write('oy')
+		open(os.path.join(
+			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
+
+		class MyTask(SimpleTask):
+			outputs = {
+				'A': File(TEST_DIR, 'out_A.txt', ignore_pilot=True),
+				'B': File(TEST_DIR, 'out_B.txt'),
+			}
+			inputs = {
+				'A': File(TEST_DIR, 'in_A.txt', ignore_pilot=True),
+				'B': File(TEST_DIR, 'in_B.txt')
+			}
+
+			def run(self):
+				self.inputs['A'].open('r').read()
+				self.inputs['B'].open('r').read()
+				self.outputs['A'].open('w').write('yo')
+				self.outputs['B'].open('w').write('yo')
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {'my_task':MyTask()}
+
+		# this will cause an error if the input prepended the input file name
+		MyRunner().run(as_pilot=True)
+
+		# check that the output was also not prepended by as_pilot
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_out_A.txt'%LOT_NAME)))
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_pilot_out_B.txt'%LOT_NAME)))
+
+
+	def test_share_resource(self):
+		'''
+			Tests that, when a resource is invoked with the keyword argument
+			share=True, it will not prepend the lot name in_front of its
+			file names.
+		'''
+
+		LOT_NAME = 'my_lot'
+
+		# make a files to be read, one prepends as_pilot, the other doesn't
+		open(os.path.join(TEST_DIR, 'in_A.txt'), 'w').write('oy')
+		open(os.path.join(
+			TEST_DIR, '%s_in_B.txt'%LOT_NAME), 'w').write('oy')
+
+		class MyTask(SimpleTask):
+			outputs = {
+				'A': File(TEST_DIR, 'out_A.txt', share=True),
+				'B': File(TEST_DIR, 'out_B.txt'),
+			}
+			inputs = {
+				'A': File(TEST_DIR, 'in_A.txt', share=True),
+				'B': File(TEST_DIR, 'in_B.txt')
+			}
+
+			def run(self):
+				self.inputs['A'].open('r').read()
+				self.inputs['B'].open('r').read()
+				self.outputs['A'].open('w').write('yo')
+				self.outputs['B'].open('w').write('yo')
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {'my_task':MyTask()}
+
+		# this will cause an error if the input prepended the input file name
+		MyRunner().run()
+
+		# check that the output was also not prepended by as_pilot
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, 'out_A.txt')))
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_out_B.txt'%LOT_NAME)))
+
+
+	def test_static_resource(self):
+		'''
+			Tests that, when a resource is invoked with the keyword argument
+			static=True, it will not put the lot name nor 'pilot_' in front 
+			of its file names.
+		'''
+
+		LOT_NAME = 'my_lot'
+
+		# make a files to be read, one prepends as_pilot, the other doesn't
+		open(os.path.join(TEST_DIR, 'in_A.txt'), 'w').write('oy')
+		open(os.path.join(
+			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
+
+		class MyTask(SimpleTask):
+			outputs = {
+				'A': File(TEST_DIR, 'out_A.txt', static=True),
+				'B': File(TEST_DIR, 'out_B.txt'),
+			}
+			inputs = {
+				'A': File(TEST_DIR, 'in_A.txt', static=True),
+				'B': File(TEST_DIR, 'in_B.txt')
+			}
+
+			def run(self):
+				self.inputs['A'].open('r').read()
+				self.inputs['B'].open('r').read()
+				self.outputs['A'].open('w').write('yo')
+				self.outputs['B'].open('w').write('yo')
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {'my_task':MyTask()}
+
+		# this will cause an error if the input prepended the input file name
+		MyRunner().run(as_pilot=True)
+
+		# check that the output was also not prepended by as_pilot
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, 'out_A.txt')))
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_pilot_out_B.txt'%LOT_NAME)))
+
+
+class TestStaticTask(TestCase):
+
+	def setUp(self):
+		os.mkdir(TEST_DIR)
+
+	def tearDown(self):
+		shutil.rmtree(TEST_DIR)
+		if os.path.exists('./linguini_markers'):
+			shutil.rmtree('./linguini_markers')
+
+
+	def test_ignore_pilot_task(self):
+		'''
+			Tests that, when a task is invoked with the keyword argument
+			ignore_pilot=True, it will invoke it's resources with pilot=False.
+			The resources will therefore not have their filenames prepended by
+			'pilot_'.
+		'''
+
+		LOT_NAME = 'my_lot'
+
+		# make a files to be read, one prepends as_pilot, the other doesn't
+		open(os.path.join(TEST_DIR, '%s_in_A.txt'%LOT_NAME), 'w').write('oy')
+		open(os.path.join(
+			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
+
+		class MyTaskA(SimpleTask):
+			outputs = File(TEST_DIR, 'out_A.txt')
+			inputs = File(TEST_DIR, 'in_A.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+
+		class MyTaskB(SimpleTask):
+			outputs = File(TEST_DIR, 'out_B.txt')
+			inputs = File(TEST_DIR, 'in_B.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {
+				'my_static_task':MyTaskA(ignore_pilot=True),
+				'my_task':MyTaskB()
+			}
+
+		# this will cause an error if the input prepended the input file name
+		MyRunner().run(as_pilot=True)
+
+		# check that the output was also not prepended by as_pilot
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_out_A.txt'%LOT_NAME)))
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_pilot_out_B.txt'%LOT_NAME)))
+
+
+	def test_share_task(self):
+		'''
+			Tests that, when a task is invoked with the keyword argument
+			share=True, it will invoke it's resources with lot=None.  The 
+			resources will therefore not have their filenames prepended by
+			the lot.
+		'''
+
+		LOT_NAME = 'my_lot'
+
+		# make a files to be read, one prepends as_pilot, the other doesn't
+		open(os.path.join(TEST_DIR, 'pilot_in_A.txt'), 'w').write('oy')
+		open(os.path.join(
+			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
+
+		class MyTaskA(SimpleTask):
+			outputs = File(TEST_DIR, 'out_A.txt')
+			inputs = File(TEST_DIR, 'in_A.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+
+		class MyTaskB(SimpleTask):
+			outputs = File(TEST_DIR, 'out_B.txt')
+			inputs = File(TEST_DIR, 'in_B.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {
+				'my_static_task':MyTaskA(share=True),
+				'my_task':MyTaskB()
+			}
+
+		# this will cause an error if the input prepended the input file name
+		MyRunner().run(as_pilot=True)
+
+		# check that the output was also not prepended by as_pilot
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, 'pilot_out_A.txt')))
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_pilot_out_B.txt'%LOT_NAME)))
+
+
+	def test_static_task(self):
+		'''
+			Tests that, when a task is invoked with the keyword argument
+			static=True, it will invoke it's resources with lot=None and
+			pilot=False.  The resources will therefore not have their
+			filenames prepended.
+		'''
+
+		LOT_NAME = 'my_lot'
+
+		# make a files to be read, one prepends as_pilot, the other doesn't
+		open(os.path.join(TEST_DIR, 'in_A.txt'), 'w').write('oy')
+		open(os.path.join(
+			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
+
+		class MyTaskA(SimpleTask):
+			outputs = File(TEST_DIR, 'out_A.txt')
+			inputs = File(TEST_DIR, 'in_A.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+
+		class MyTaskB(SimpleTask):
+			outputs = File(TEST_DIR, 'out_B.txt')
+			inputs = File(TEST_DIR, 'in_B.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {
+				'my_static_task':MyTaskA(static=True),
+				'my_task':MyTaskB()
+			}
+
+		# this will cause an error if the input prepended the input file name
+		MyRunner().run(as_pilot=True)
+
+		# check that the output was also not prepended by as_pilot
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, 'out_A.txt')))
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_pilot_out_B.txt'%LOT_NAME)))
+
+
+class TestStaticRunner(TestCase):
+
+	def setUp(self):
+		os.mkdir(TEST_DIR)
+
+	def tearDown(self):
+		shutil.rmtree(TEST_DIR)
+		if os.path.exists('./linguini_markers'):
+			shutil.rmtree('./linguini_markers')
+
+	def test_static_runner(self):
+		'''
+			Tests that, when a runner is invoked with the keyword argument
+			static=True, it will not inherit it's parent's lot name, and it
+			will always run with pilot=False, even if it's parent is run
+			with pilot=True.
+		'''
+
+		LOT_NAME = 'my_lot'
+		LOT_NAME_A = 'my_lot_A'
+		LOT_NAME_B = 'my_lot_B'
+
+		# make a files to be read, one prepends as_pilot, the other doesn't
+		# and one uses the lot name of the subrunner, the other uses that
+		# of the parent runner
+		open(os.path.join(
+			TEST_DIR, '%s_in_A.txt' % LOT_NAME_A), 'w').write('oy')
+		open(os.path.join(
+			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
+
+		class MyTaskA(SimpleTask):
+			outputs = File(TEST_DIR, 'out_A.txt')
+			inputs = File(TEST_DIR, 'in_A.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+		class MyTaskB(SimpleTask):
+			outputs = File(TEST_DIR, 'out_B.txt')
+			inputs = File(TEST_DIR, 'in_B.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+		class SubRunnerA(Runner):
+			lot = LOT_NAME_A
+			tasks = {'my_task':MyTaskA()}
+
+		class SubRunnerB(Runner):
+			lot = LOT_NAME_B
+			tasks = {'my_task':MyTaskB()}
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {
+				'runner_A': SubRunnerA(static=True),
+				'runner_B': SubRunnerB()
+			}
+
+		# this will cause an error if the input prepended the input file name
+		MyRunner().run(as_pilot=True)
+
+		# check that the output was also not prepended by as_pilot
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_out_A.txt'%LOT_NAME_A)))
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_pilot_out_B.txt'%LOT_NAME)))
+
+
+	def test_ignore_pilot_runner(self):
+		'''
+			Tests that, when a runner is instantiated with the keyword 
+			argument ignore_pilot=True, it will be run with pilot=False even
+			if its parent is run with pilot=True.
+		'''
+
+		LOT_NAME = 'my_lot'
+		LOT_NAME_A = 'my_lot_A'
+		LOT_NAME_B = 'my_lot_B'
+
+		# make a files to be read, one prepends as_pilot, the other doesn't
+		open(os.path.join(
+			TEST_DIR, '%s_in_A.txt' % LOT_NAME), 'w').write('oy')
+		open(os.path.join(
+			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
+
+		class MyTaskA(SimpleTask):
+			outputs = File(TEST_DIR, 'out_A.txt')
+			inputs = File(TEST_DIR, 'in_A.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+		class MyTaskB(SimpleTask):
+			outputs = File(TEST_DIR, 'out_B.txt')
+			inputs = File(TEST_DIR, 'in_B.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+		class SubRunnerA(Runner):
+			lot = LOT_NAME_A
+			tasks = {'my_task':MyTaskA()}
+
+		class SubRunnerB(Runner):
+			lot = LOT_NAME_B
+			tasks = {'my_task':MyTaskB()}
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {
+				'runner_A': SubRunnerA(ignore_pilot=True),
+				'runner_B': SubRunnerB()
+			}
+
+		# this will cause an error if the input prepended the input file name
+		MyRunner().run(as_pilot=True)
+
+		# check that the output was also not prepended by as_pilot
+		# but both sub-runners still inherit their parent's lot name 
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_out_A.txt'%LOT_NAME)))
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_pilot_out_B.txt'%LOT_NAME)))
+
+
+
+	def test_share_runner(self):
+		'''
+			Tests that, when a runner is instantiated with the keyword 
+			argument ignore_pilot=True, it will be run with pilot=False even
+			if its parent is run with pilot=True.
+		'''
+
+		LOT_NAME = 'my_lot'
+		LOT_NAME_A = 'my_lot_A'
+		LOT_NAME_B = 'my_lot_B'
+
+		# make files to be read, one uses lot name of the subrunner, the other
+		# uses lot name of the parent runner.  Both prepend with pilot.
+		open(os.path.join(
+			TEST_DIR, '%s_pilot_in_A.txt' % LOT_NAME_A), 'w').write('oy')
+		open(os.path.join(
+			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
+
+		class MyTaskA(SimpleTask):
+			outputs = File(TEST_DIR, 'out_A.txt')
+			inputs = File(TEST_DIR, 'in_A.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+		class MyTaskB(SimpleTask):
+			outputs = File(TEST_DIR, 'out_B.txt')
+			inputs = File(TEST_DIR, 'in_B.txt')
+
+			def run(self):
+				self.inputs.open('r').read()
+				self.outputs.open('w').write('yo')
+
+		class SubRunnerA(Runner):
+			lot = LOT_NAME_A
+			tasks = {'my_task':MyTaskA()}
+
+		class SubRunnerB(Runner):
+			lot = LOT_NAME_B
+			tasks = {'my_task':MyTaskB()}
+
+		class MyRunner(Runner):
+			lot = LOT_NAME
+			tasks = {
+				'runner_A': SubRunnerA(share=True),
+				'runner_B': SubRunnerB()
+			}
+
+		# this will cause an error if the input prepended the input file name
+		MyRunner().run(as_pilot=True)
+
+		# check that the output was also not prepended by as_pilot
+		# but both sub-runners still inherit their parent's lot name 
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_pilot_out_A.txt'%LOT_NAME_A)))
+		self.assertTrue(os.path.isfile(
+			os.path.join(TEST_DIR, '%s_pilot_out_B.txt'%LOT_NAME)))
 
 
 

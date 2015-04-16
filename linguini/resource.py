@@ -9,30 +9,59 @@ class ResourceException(Exception):
 class Resource(object):
 
 
+	def __init__(self, **kwargs):
+		self.resolve_static(**kwargs)
+
+
+	def resolve_static(self, **kwargs):
+		# Resolve the `static`, `share`, and `ignore_pilot` attributes
+		self.static = kwargs.pop('static', False)
+		self.share = kwargs.pop('share', False)
+		self.ignore_pilot = kwargs.pop('ignore_pilot', False)
+
+		if self.static:
+			self.share = True
+			self.ignore_pilot = True
+
+
 	def resolve_attr(self, attr_name, attr_val, default=None, raises=True):
 
+		# self.attr_name takes precedence, but if unset or none, use attr_val 
 		if not hasattr(self, attr_name) or getattr(self, attr_name) is None:
 			setattr(self, attr_name, attr_val)
 
+		# if attr_val is None, try using the default value
 		if getattr(self, attr_name) is None:
 			setattr(self, attr_name, default)
 
+		# if the attribute is still None, maybe raise exception
 		if getattr(self, attr_name) is None and raises:
 			raise ResourceException('No value found for %s.' % attr_name)
 
+		# attribute value was set to self.attr_name, but we also return it
 		return getattr(self, attr_name)
 
 		
 	def get_ready(self, lot, as_pilot, name, clobber):
 
 		# resolve propogation of the run properties
-		self.resolve_attr('lot', lot)
+		#
+		# lot can be none now, because of how static / share works
+		self.resolve_attr('lot', lot, raises=False)
 		self.resolve_attr('as_pilot', as_pilot, False)
+
 		self.resolve_attr('name', name)
 		self.resolve_attr('clobber', clobber)
 
-		# make sure that the lot is string-like
-		if not isinstance(self.lot, basestring):
+		# enforce `ignore_pilot` and `share`, by overriding lot and pilot
+		if self.ignore_pilot:
+			self.as_pilot = False
+
+		if self.share:
+			self.lot = None
+
+		# make sure that the lot is string-like or None
+		if not isinstance(self.lot, basestring) and self.lot is not None :
 			raise ValueError(
 				'`lot` must be an instance of basestr, like str or unicode.'
 			)
@@ -53,11 +82,12 @@ class Resource(object):
 		)
 
 
-class FileResource(Resource):
+class File(Resource):
 
-	def __init__(self, path, fname):
+	def __init__(self, path, fname, **kwargs):
 		self.path = path
 		self.fname = fname
+		super(File, self).__init__(**kwargs)
 
 
 	def get_path(self):
@@ -67,8 +97,8 @@ class FileResource(Resource):
 			raise ResourceException('Resource is not ready.')
 
 		fname = (
-			self.lot + '_' 
-			+ ('pilot' if self.as_pilot else '') 
+			(('%s_' % self.lot) if self.lot is not None else '')
+			+ ('pilot_' if self.as_pilot else '')
 			+ self.fname
 		)
 		return os.path.join(self.path, fname)
@@ -85,7 +115,7 @@ class FileResource(Resource):
 			# if writing, check whether the file exists
 			if os.path.isfile(self.get_path()):
 				raise IOError(
-					'FileResource: by default, I refuse to overwrite files. '
+					'File: by default, I refuse to overwrite files. '
 					+ self.get_path()
 				)
 
@@ -96,7 +126,7 @@ class FileResource(Resource):
 			# ensure that the directory is not an existing file
 			if os.path.isfile(self.path):
 				raise IOError(
-					'FileResource: the given path corresponds to an existing '
+					'File: the given path corresponds to an existing '
 					'*file*.'
 				)
 
@@ -104,7 +134,7 @@ class FileResource(Resource):
 		return open(self.get_path(), flags)
 
 
-class MarkerResource(FileResource):
+class MarkerResource(File):
 	def mark(self):
 
 		# if the marker path already exists, perfect
@@ -126,7 +156,7 @@ class MarkerResource(FileResource):
 		self.open('a').write('%s\n' % str(datetime.now()))
 
 
-class IncrementalFileResource(object):
+class IncrementalFile(object):
 	'''
 		This is like a file resource, but we don't rely on the existence of
 		the file to determine whether the resource is satisfied.  We use a
@@ -160,7 +190,7 @@ class IncrementalFileResource(object):
 
 
 
-class FolderResource(FileResource):
+class Folder(File):
 	'''
 		Creates (if necessary) a folder that is namepsaced to the lot, 
 		and allows reading and writing files there.  File names are not
@@ -179,7 +209,7 @@ class FolderResource(FileResource):
 		# if a file (rather than folder) exists, it's an error
 		elif os.path.exists(self.get_path()):
 			raise IOError(
-				'FolderResource: the given path corresponds to an existing '
+				'Folder: the given path corresponds to an existing '
 				'*file*.  I cannot create a directory here: %s' 
 				% self.get_path()
 			)
@@ -191,14 +221,14 @@ class FolderResource(FileResource):
 		# check if the specific file exists (as a folder or file)
 		if os.path.isdir(self.get_fname(fname)):
 			raise IOError(
-				'FolderResource: a file or folder exists there. '
+				'Folder: a file or folder exists there. '
 				'I can\'t make a file: %s' % self.get_fname(fname)
 			)
 
 		# if we're opening in write mode, don't overwrite an existing file
 		if 'w' in mode and os.path.isfile(self.get_fname(fname)):
 			raise IOError(
-				'FolderResource: a file already exists there. '
+				'Folder: a file already exists there. '
 				'I don not overwrite by default: %s' % self.get_fname(fname)
 			)
 
