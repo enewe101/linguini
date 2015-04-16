@@ -99,7 +99,7 @@ class Runner(Task):
 	def get_ready(
 			self,
 			lot=None,
-			as_pilot=False,
+			pilot=False,
 			name='main',
 			clobber=False
 		):
@@ -117,9 +117,9 @@ class Runner(Task):
 		# if ignore pilot is true, then pilot is forced false.  Otherwise
 		# it is inherited
 		if self.ignore_pilot:
-			self.as_pilot = False
+			self.pilot = False
 		else:
-			self.resolve_attr('as_pilot', as_pilot, False)
+			self.resolve_attr('pilot', pilot, False)
 
 		self.resolve_attr('name', name)
 		self.resolve_attr('clobber', clobber)
@@ -133,7 +133,7 @@ class Runner(Task):
 			task = as_list(self.tasks[task_name])[0]
 
 			task.get_ready(
-				lot=self.lot, as_pilot=self.as_pilot, name=task_name, 
+				lot=self.lot, pilot=self.pilot, name=task_name, 
 				clobber=clobber
 			)
 
@@ -209,7 +209,7 @@ class Runner(Task):
 			cyc_d = cyclical_dependencies[0]
 			entry = pending_tasks.index(cyc_d)
 			cycle = pending_tasks[entry:] + [cyc_d]
-			problem = 'cyclical dependency: %s' % [' -> '].join(cycle)
+			problem = 'cyclical dependency: %s' % ' -> '.join(cycle)
 			return False, problem
 
 		okay, problem = True, None
@@ -258,19 +258,19 @@ class Runner(Task):
 	def _run(
 			self, 
 			lot=None,
-			as_pilot=False,
+			pilot=False,
 			until=None,
 			clobber=None,
 			share=False
 		):
 
-		self.run(lot, as_pilot=as_pilot, until=until, clobber=clobber)
+		self.run(lot, pilot=pilot, until=until, clobber=clobber)
 
 
 	def run(
 			self, 
 			lot=None,
-			as_pilot=False,
+			pilot=False,
 			until=None,
 			clobber=False,
 			share=False
@@ -280,7 +280,7 @@ class Runner(Task):
 
 		self.get_ready(
 			lot=lot, 
-			as_pilot=as_pilot,
+			pilot=pilot,
 			name='main',
 			clobber=clobber
 		)

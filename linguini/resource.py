@@ -42,20 +42,20 @@ class Resource(object):
 		return getattr(self, attr_name)
 
 		
-	def get_ready(self, lot, as_pilot, name, clobber):
+	def get_ready(self, lot, pilot, name, clobber):
 
 		# resolve propogation of the run properties
 		#
 		# lot can be none now, because of how static / share works
 		self.resolve_attr('lot', lot, raises=False)
-		self.resolve_attr('as_pilot', as_pilot, False)
+		self.resolve_attr('pilot', pilot, False)
 
 		self.resolve_attr('name', name)
 		self.resolve_attr('clobber', clobber)
 
 		# enforce `ignore_pilot` and `share`, by overriding lot and pilot
 		if self.ignore_pilot:
-			self.as_pilot = False
+			self.pilot = False
 
 		if self.share:
 			self.lot = None
@@ -98,7 +98,7 @@ class File(Resource):
 
 		fname = (
 			(('%s_' % self.lot) if self.lot is not None else '')
-			+ ('pilot_' if self.as_pilot else '')
+			+ ('pilot_' if self.pilot else '')
 			+ self.fname
 		)
 		return os.path.join(self.path, fname)

@@ -1,4 +1,5 @@
 - finish adding clobber keyword functionality
+
 x Runners have a simpler syntax for specifying tasks and dependencies.
 
 x Runners, Tasks, and resources accept static, share, ignore_pilot
@@ -21,12 +22,12 @@ x Runners, Tasks, and resources accept static, share, ignore_pilot
 	- use marker files
 	- not require outputs / inputs
 
-- Rename FileResource to File
-- Rename FolderResource to Folder 
-- Rename as_pilot to pilot
+x Rename FileResource to File
+x Rename FolderResource to Folder 
+x Rename as_pilot to pilot
 
-- test that cyclical dependencies are caught
-- test that non-existent dependencies are caught
+x test that cyclical dependencies are caught
+x test that non-existent dependencies are caught
 
 
 

@@ -165,6 +165,103 @@ class TestRunner(TestCase):
 		self.assertTrue(task2.was_run)
 		self.assertTrue(task3.was_run)
 
+	
+	def test_catch_cyclical_dependency(self):
+
+		class MyTask(SimpleTask):
+			def run(self):
+				pass
+
+		# a simple cycle
+		class MyRunner(Runner):
+			lot = 'my_lot'
+			tasks = {
+				'task0': (MyTask(), 'task1'),
+				'task1': (MyTask(), 'task0'),
+			}
+
+		with self.assertRaises(RunnerException):
+			MyRunner().run()
+
+		# check that the cyclical dependency is reported correctly
+		okay, problem = MyRunner().check_schedule()
+		self.assertEqual(
+			problem,
+			'cyclical dependency: task0 -> task1 -> task0'
+		)
+
+
+
+		# a bit more complicated cycle
+		class MoRunner(Runner):
+			lot = 'mo_lot'
+			tasks = {
+				'task0': (MyTask(), 'task1', 'task2'),
+				'task1': (MyTask(), 'task3', 'task4'),
+				'task2': (MyTask(), 'task5', 'task6'),
+				'task3': (MyTask(), 'task2'),
+				'task4': MyTask(),
+				'task5': (MyTask(), 'task1'),
+				'task6': MyTask()
+			}
+			
+		with self.assertRaises(RunnerException):
+			MoRunner().run()
+
+		# check that the cyclical dependency is reported correctly
+		okay, problem = MoRunner().check_schedule()
+		self.assertEqual(
+			problem,
+			'cyclical dependency: task1 -> task3 -> task2 -> task5 -> task1'
+		)
+
+		# here we point to a potentially previously scheduled task, but 
+		# there's no cycle -- it should work
+		class MiRunner(Runner):
+			lot = 'mo_lot'
+			tasks = {
+				'task0': (MyTask(), 'task1', 'task2'),
+				'task1': (MyTask(), 'task3', 'task4'),
+				'task2': (MyTask(), 'task5', 'task6'),
+				'task3': (MyTask(), 'task2'),
+				'task4': MyTask(),
+				'task5': (MyTask(), 'task6'),
+				'task6': MyTask()
+			}
+			
+		MiRunner().run()
+
+	def test_catch_nonexistent_dependency(self):
+
+		class MyTask(SimpleTask):
+			def run(self):
+				pass
+
+		# task 1 is not defined!
+		class MyRunner(Runner):
+			lot = 'my_lot'
+			tasks = {
+				'task0': (MyTask(), 'task1'),
+			}
+
+		with self.assertRaises(RunnerException):
+			MyRunner().run()
+
+		# task7 is not defined!
+		class MoRunner(Runner):
+			lot = 'mo_lot'
+			tasks = {
+				'task0': (MyTask(), 'task1', 'task2'),
+				'task1': (MyTask(), 'task3', 'task4'),
+				'task2': (MyTask(), 'task5', 'task6', 'task7'),
+				'task3': (MyTask(), 'task2'),
+				'task4': MyTask(),
+				'task5': (MyTask(), 'task6'),
+				'task6': MyTask()
+			}
+			
+		with self.assertRaises(RunnerException):
+			MoRunner().run()
 
 class TestMarkerTask(TestCase):
 	def setUp(self):
@@ -235,9 +332,9 @@ class TestMarkerTask(TestCase):
 		class MyTask(Task):
 			ready_override = False
 			after_override = False
-			def get_ready(self, lot, as_pilot, name, clobber):
+			def get_ready(self, lot, pilot, name, clobber):
 				super(MyTask, self).get_ready(
-					lot, as_pilot, name, clobber
+					lot, pilot, name, clobber
 				)
 				self.ready_override = True
 
@@ -294,9 +391,6 @@ class TestMarkerTask(TestCase):
 class TestSimpleTask(TestCase):
 
 	TEST_DIR = 'linguini_markers'
-	def setUp(self):
-		os.mkdir(self.TEST_DIR)
-
 	def tearDown(self):
 		shutil.rmtree(self.TEST_DIR)
 
@@ -837,7 +931,7 @@ class TestStatic(TestCase):
 
 		LOT_NAME = 'my_lot'
 
-		# make a files to be read, one prepends as_pilot, the other doesn't
+		# make a files to be read, one prepends pilot, the other doesn't
 		open(os.path.join(TEST_DIR, '%s_in_A.txt'%LOT_NAME), 'w').write('oy')
 		open(os.path.join(
 			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
@@ -863,9 +957,9 @@ class TestStatic(TestCase):
 			tasks = {'my_task':MyTask()}
 
 		# this will cause an error if the input prepended the input file name
-		MyRunner().run(as_pilot=True)
+		MyRunner().run(pilot=True)
 
-		# check that the output was also not prepended by as_pilot
+		# check that the output was also not prepended by pilot
 		self.assertTrue(os.path.isfile(
 			os.path.join(TEST_DIR, '%s_out_A.txt'%LOT_NAME)))
 		self.assertTrue(os.path.isfile(
@@ -881,7 +975,7 @@ class TestStatic(TestCase):
 
 		LOT_NAME = 'my_lot'
 
-		# make a files to be read, one prepends as_pilot, the other doesn't
+		# make a files to be read, one prepends pilot, the other doesn't
 		open(os.path.join(TEST_DIR, 'in_A.txt'), 'w').write('oy')
 		open(os.path.join(
 			TEST_DIR, '%s_in_B.txt'%LOT_NAME), 'w').write('oy')
@@ -909,7 +1003,7 @@ class TestStatic(TestCase):
 		# this will cause an error if the input prepended the input file name
 		MyRunner().run()
 
-		# check that the output was also not prepended by as_pilot
+		# check that the output was also not prepended by pilot
 		self.assertTrue(os.path.isfile(
 			os.path.join(TEST_DIR, 'out_A.txt')))
 		self.assertTrue(os.path.isfile(
@@ -925,7 +1019,7 @@ class TestStatic(TestCase):
 
 		LOT_NAME = 'my_lot'
 
-		# make a files to be read, one prepends as_pilot, the other doesn't
+		# make a files to be read, one prepends pilot, the other doesn't
 		open(os.path.join(TEST_DIR, 'in_A.txt'), 'w').write('oy')
 		open(os.path.join(
 			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
@@ -951,9 +1045,9 @@ class TestStatic(TestCase):
 			tasks = {'my_task':MyTask()}
 
 		# this will cause an error if the input prepended the input file name
-		MyRunner().run(as_pilot=True)
+		MyRunner().run(pilot=True)
 
-		# check that the output was also not prepended by as_pilot
+		# check that the output was also not prepended by pilot
 		self.assertTrue(os.path.isfile(
 			os.path.join(TEST_DIR, 'out_A.txt')))
 		self.assertTrue(os.path.isfile(
@@ -981,7 +1075,7 @@ class TestStaticTask(TestCase):
 
 		LOT_NAME = 'my_lot'
 
-		# make a files to be read, one prepends as_pilot, the other doesn't
+		# make a files to be read, one prepends pilot, the other doesn't
 		open(os.path.join(TEST_DIR, '%s_in_A.txt'%LOT_NAME), 'w').write('oy')
 		open(os.path.join(
 			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
@@ -1012,9 +1106,9 @@ class TestStaticTask(TestCase):
 			}
 
 		# this will cause an error if the input prepended the input file name
-		MyRunner().run(as_pilot=True)
+		MyRunner().run(pilot=True)
 
-		# check that the output was also not prepended by as_pilot
+		# check that the output was also not prepended by pilot
 		self.assertTrue(os.path.isfile(
 			os.path.join(TEST_DIR, '%s_out_A.txt'%LOT_NAME)))
 		self.assertTrue(os.path.isfile(
@@ -1031,7 +1125,7 @@ class TestStaticTask(TestCase):
 
 		LOT_NAME = 'my_lot'
 
-		# make a files to be read, one prepends as_pilot, the other doesn't
+		# make a files to be read, one prepends pilot, the other doesn't
 		open(os.path.join(TEST_DIR, 'pilot_in_A.txt'), 'w').write('oy')
 		open(os.path.join(
 			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
@@ -1062,9 +1156,9 @@ class TestStaticTask(TestCase):
 			}
 
 		# this will cause an error if the input prepended the input file name
-		MyRunner().run(as_pilot=True)
+		MyRunner().run(pilot=True)
 
-		# check that the output was also not prepended by as_pilot
+		# check that the output was also not prepended by pilot
 		self.assertTrue(os.path.isfile(
 			os.path.join(TEST_DIR, 'pilot_out_A.txt')))
 		self.assertTrue(os.path.isfile(
@@ -1081,7 +1175,7 @@ class TestStaticTask(TestCase):
 
 		LOT_NAME = 'my_lot'
 
-		# make a files to be read, one prepends as_pilot, the other doesn't
+		# make a files to be read, one prepends pilot, the other doesn't
 		open(os.path.join(TEST_DIR, 'in_A.txt'), 'w').write('oy')
 		open(os.path.join(
 			TEST_DIR, '%s_pilot_in_B.txt'%LOT_NAME), 'w').write('oy')
@@ -1112,9 +1206,9 @@ class TestStaticTask(TestCase):
 			}
 
 		# this will cause an error if the input prepended the input file name
-		MyRunner().run(as_pilot=True)
+		MyRunner().run(pilot=True)
 
-		# check that the output was also not prepended by as_pilot
+		# check that the output was also not prepended by pilot
 		self.assertTrue(os.path.isfile(
 			os.path.join(TEST_DIR, 'out_A.txt')))
 		self.assertTrue(os.path.isfile(
@@ -1143,7 +1237,7 @@ class TestStaticRunner(TestCase):
 		LOT_NAME_A = 'my_lot_A'
 		LOT_NAME_B = 'my_lot_B'
 
-		# make a files to be read, one prepends as_pilot, the other doesn't
+		# make a files to be read, one prepends pilot, the other doesn't
 		# and one uses the lot name of the subrunner, the other uses that
 		# of the parent runner
 		open(os.path.join(
@@ -1183,9 +1277,9 @@ class TestStaticRunner(TestCase):
 			}
 
 		# this will cause an error if the input prepended the input file name
-		MyRunner().run(as_pilot=True)
+		MyRunner().run(pilot=True)
 
-		# check that the output was also not prepended by as_pilot
+		# check that the output was also not prepended by pilot
 		self.assertTrue(os.path.isfile(
 			os.path.join(TEST_DIR, '%s_out_A.txt'%LOT_NAME_A)))
 		self.assertTrue(os.path.isfile(
@@ -1203,7 +1297,7 @@ class TestStaticRunner(TestCase):
 		LOT_NAME_A = 'my_lot_A'
 		LOT_NAME_B = 'my_lot_B'
 
-		# make a files to be read, one prepends as_pilot, the other doesn't
+		# make a files to be read, one prepends pilot, the other doesn't
 		open(os.path.join(
 			TEST_DIR, '%s_in_A.txt' % LOT_NAME), 'w').write('oy')
 		open(os.path.join(
@@ -1241,9 +1335,9 @@ class TestStaticRunner(TestCase):
 			}
 
 		# this will cause an error if the input prepended the input file name
-		MyRunner().run(as_pilot=True)
+		MyRunner().run(pilot=True)
 
-		# check that the output was also not prepended by as_pilot
+		# check that the output was also not prepended by pilot
 		# but both sub-runners still inherit their parent's lot name 
 		self.assertTrue(os.path.isfile(
 			os.path.join(TEST_DIR, '%s_out_A.txt'%LOT_NAME)))
@@ -1302,9 +1396,9 @@ class TestStaticRunner(TestCase):
 			}
 
 		# this will cause an error if the input prepended the input file name
-		MyRunner().run(as_pilot=True)
+		MyRunner().run(pilot=True)
 
-		# check that the output was also not prepended by as_pilot
+		# check that the output was also not prepended by pilot
 		# but both sub-runners still inherit their parent's lot name 
 		self.assertTrue(os.path.isfile(
 			os.path.join(TEST_DIR, '%s_pilot_out_A.txt'%LOT_NAME_A)))
