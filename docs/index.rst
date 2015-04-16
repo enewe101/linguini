@@ -69,8 +69,8 @@ task::
         inputs = FileResource(PATH, 'in.txt')
         
         def run(self):
-            in_fh = inputs.open('r')
-            out_fh = outputs.open('w')
+            in_fh = self.inputs.open('r')
+            out_fh = self.outputs.open('w')
             out_fh.write('\n'.join(reversed(in_fh.readlines())))
 
 This task writes the lines from out.txt, in reverse order, to out.txt.
