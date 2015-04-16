@@ -3,6 +3,9 @@ LEFT OFF:
 	- overhauled inheritance mechanism, but need to test inheritance
 		of pilot, clobber, and lot
 
+- in File resource, use codecs.open, and allow passing a codec
+- enable automatically reading/writing gzip by specifying compress='gzip'
+	or compress=False options
 - fix resolution of until
 - finish adding clobber keyword functionality
 - ensure that resources don't overwrite files unless in clobber mode

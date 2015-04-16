@@ -163,7 +163,9 @@ class File(Resource):
 		return open(self.get_path(), flags)
 
 
+
 class MarkerResource(File):
+
 	def mark(self):
 
 		# if the marker path already exists, perfect
@@ -249,23 +251,29 @@ class Folder(File):
 
 		# check if the specific file exists (as a folder or file)
 		if os.path.isdir(self.get_fname(fname)):
-			if self.get_clobber():
-				print '\tINFO: clobbered %s' % self.get_fname(fname)
 
 			raise IOError(
-				'Folder: a file or folder exists there. '
-				'I can\'t make a file: %s' % self.get_fname(fname)
+				'Folder: a folder exists there. '
+				'I can\'t make a file, even if clobber is True: %s' 
+				% self.get_fname(fname)
 			)
 
 		# if we're opening in write mode, don't overwrite an existing file
+		# unless in clobber mode
 		if 'w' in mode and os.path.isfile(self.get_fname(fname)):
-			raise IOError(
-				'Folder: a file already exists there. '
-				'I don not overwrite by default: %s' % self.get_fname(fname)
-			)
+
+			if self.get_clobber():
+				print '\tINFO: clobbered %s' % self.get_fname(fname)
+
+			else:
+				raise IOError(
+					'Folder: a file already exists there. '
+					'I do not overwrite by default: %s' % self.get_fname(fname)
+				)
 
 		# if all is good, open and yield the file resource
 		return open(self.get_fname(fname), mode)
+
 
 
 	#TODO: define exists

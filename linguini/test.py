@@ -1473,6 +1473,28 @@ class TestClobberInheritance(TestCase):
 		self.assertFalse(my_file.get_clobber())
 
 
+	def test_folder_resource(self):
+		subfolder = os.path.join(TEST_DIR, 'subfolder')
+		os.mkdir(subfolder)
+
+		class MyTask(SimpleTask):
+			outputs = Folder(TEST_DIR, 'subfolder')
+			def run(self):
+				self.outputs.open('yo.txt', 'w').write('yo')
+
+		class MyRunner(Runner):
+			lot='my_lot'
+			tasks = {
+				'task': MyTask()
+			}
+
+		MyRunner().run(clobber=True)
+		MyRunner().run(clobber=True)
+		
+
+
+
+
 	def test_task_inheritance(self):
 
 		LOT_NAME = 'my_lot'
