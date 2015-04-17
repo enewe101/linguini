@@ -228,6 +228,11 @@ class Folder(File):
 		namespaced (because the folder is).
 	'''
 
+	def __init__(self, path, dirname, *args, **kwargs):
+		self.whitelist = kwargs.pop('whitelist', None)
+		self.blacklist = kwargs.pop('blacklist', None)
+		super(Folder, self).__init__(path, dirname, *args, **kwargs)
+
 	def get_fname(self, fname):
 		return os.path.join(self.get_path(), fname)
 
@@ -277,10 +282,11 @@ class Folder(File):
 
 	def __iter__(self):
 		# make a fresh list of all the files in the dir
-		self.files = [
-			f for f in os.listdir(self.get_path()) 
-			if os.path.isfile(f)
+		files = [
+			os.path.abspath(os.path.join(self.get_path(), f))
+			for f in os.listdir(self.get_path()) 
 		]
+		self.files = [f for f in files if os.path.isfile(f)]
 		return self
 
 
