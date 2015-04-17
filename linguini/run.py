@@ -136,7 +136,7 @@ class Runner(Task):
 			task = task_def[0]
 			dependencies = task_def[1:]
 
-			if not task.exists() or self.get_clobber():
+			if not task.exists() or task.get_clobber():
 
 				# add tasks to the schedule, without permitting duplicates
 				scheduled.add(task_name)

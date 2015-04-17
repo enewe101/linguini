@@ -1473,27 +1473,6 @@ class TestClobberInheritance(TestCase):
 		self.assertFalse(my_file.get_clobber())
 
 
-	def test_folder_resource(self):
-		subfolder = os.path.join(TEST_DIR, 'subfolder')
-		os.mkdir(subfolder)
-
-		class MyTask(SimpleTask):
-			outputs = Folder(TEST_DIR, 'subfolder')
-			def run(self):
-				self.outputs.open('yo.txt', 'w').write('yo')
-
-		class MyRunner(Runner):
-			lot='my_lot'
-			tasks = {
-				'task': MyTask()
-			}
-
-		MyRunner().run(clobber=True)
-		MyRunner().run(clobber=True)
-		
-
-
-
 
 	def test_task_inheritance(self):
 
@@ -1559,6 +1538,115 @@ class TestClobberInheritance(TestCase):
 			tasks = {
 				'task1' : task
 			}
+
+
+
+class TestClobberMode(TestCase):
+
+	def setUp(self):
+		os.mkdir(TEST_DIR)
+
+
+	def tearDown(self):
+		shutil.rmtree(TEST_DIR)
+		if os.path.exists('./linguini_markers'):
+			shutil.rmtree('./linguini_markers')
+
+
+	def test_folder_resource(self):
+		'''
+			test that when a task is run in clobber mode, the Folder
+			resource is willing to overwrite files
+		'''
+		subfolder = os.path.join(TEST_DIR, 'subfolder')
+		os.mkdir(subfolder)
+
+		class MyTask(SimpleTask):
+			outputs = Folder(TEST_DIR, 'subfolder')
+			def run(self):
+				self.outputs.open('yo.txt', 'w').write('yo')
+
+		class MyRunner(Runner):
+			lot='my_lot'
+			tasks = {
+				'task': MyTask()
+			}
+
+		MyRunner().run(clobber=True)
+		MyRunner().run(clobber=True)
+
+	
+	def test_simple_task_inherit(self):
+
+		runs = []
+		class MyTask(SimpleTask):
+			def run(self):
+				runs.append('yo')
+
+		class MyRunner(Runner):
+			lot = 'my_runner'
+			tasks = {
+				'task': MyTask()
+			}
+
+		# to begin with we haven't run the runner yet
+		self.assertEqual(len(runs), 0)
+
+		# after first call to run, we can see it has run once
+		MyRunner().run()
+		self.assertEqual(len(runs), 1)
+
+		# second call to run does not cause it to run 
+		MyRunner().run()
+		self.assertEqual(len(runs), 1)
+
+		# we can force it to run again using clobber
+		MyRunner().run(clobber=True)
+		self.assertEqual(len(runs), 2)
+
+		# now we test the clobber argument when added to the Tasks class
+		# definition
+		
+
+	def test_simple_task_invocation(self):
+
+		runs = []
+
+		class MyTask(SimpleTask):
+			clobber = True
+			def run(self):
+				runs.append('yo')
+
+		my_task = MyTask()
+
+		class MyRunner(Runner):
+			lot = 'my_runner'
+			tasks = {
+				'task': my_task
+			}
+
+
+		# to begin with we haven't run the runner yet
+		self.assertEqual(len(runs), 0)
+
+		# after first call to run, we can see it has run once
+		MyRunner().run()
+		self.assertEqual(len(runs), 1)
+
+		self.assertTrue(my_task.get_clobber())
+
+		# second call will run it, because the class def has clobber=True
+		MyRunner().run()
+		self.assertEqual(len(runs), 2)
+
+		## we can force it to run again using clobber
+		#MyRunner().run(clobber=True)
+		#self.assertEqual(len(runs), 2)
+
+
+
+		
+
 
 
 

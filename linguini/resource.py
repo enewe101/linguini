@@ -275,6 +275,36 @@ class Folder(File):
 		return open(self.get_fname(fname), mode)
 
 
+	def __iter__(self):
+		# make a fresh list of all the files in the dir
+		self.files = [
+			f for f in os.listdir(self.get_path()) 
+			if os.path.isfile(f)
+		]
+		return self
+
+
+	def next(self):
+
+		try:
+			fname = self.files.pop()
+		except IndexError:
+			raise StopIteration
+
+		if self.whitelist is not None:
+			if self.whitelist.match(fname):
+				return fname
+			else:
+				return self.next()
+
+		if self.blacklist is not None:
+			if self.blacklist.match(fname):
+				return self.next()
+			else:
+				return fname
+
+		return fname
+
 
 	#TODO: define exists
 	def exists(self):
