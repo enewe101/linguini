@@ -1,3 +1,4 @@
+from utils import copy, saves_args
 from resource import Resource, MarkerResource
 
 class TaskException(Exception):
@@ -6,10 +7,10 @@ class TaskException(Exception):
 
 class Task(Resource):
 
-	parameters = {}
 	inputs = None
+	outputs = None
 
-
+	@saves_args
 	def __init__(self, **kwargs):
 		
 		# update any class-level parameters with those provided in constructor
@@ -38,13 +39,13 @@ class Task(Resource):
 		super(Task,self).get_ready(lot, pilot, name, clobber)
 
 		# Ready the inputs
-		self.input = self._inputs()
+		self.inputs = copy(self._inputs())
 		for input in self.get_all_inputs():
 			input.get_ready(
 				self.get_lot(), self.get_pilot(), 'poop', self.get_clobber())
 
 		# Ready the outputs 
-		self.outputs = self._outputs()
+		self.outputs = copy(self._outputs())
 		for output in self.get_all_outputs():
 			output.get_ready(
 				self.get_lot(), self.get_pilot(), 'poop', self.get_clobber())
@@ -55,10 +56,10 @@ class Task(Resource):
 		if self.inputs is None:
 			return []
 
-		if isinstance(self.input, Resource):
-			inputs = [self.input]
+		if isinstance(self.inputs, Resource):
+			inputs = [self.inputs]
 
-		elif isinstance(self.input, dict):
+		elif isinstance(self.inputs, dict):
 			inputs = self.inputs.values()
 
 		else:
@@ -106,13 +107,7 @@ class Task(Resource):
 
 
 	def _outputs(self):
-		try:
-			return self.outputs
-		except AttributeError:
-			raise TaskException(
-				'You must define outputs for a task.  For tasks that have '
-				'No output, explicitly define `outputs = None`.'
-			)
+		return self.outputs
 
 
 	def _inputs(self):

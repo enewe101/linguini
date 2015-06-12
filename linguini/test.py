@@ -9,6 +9,8 @@ import os
 
 TEST_DIR = 'temporary_testing_files'
 
+#TODO: test that the file resource creates folders along the path if needed
+#	when opened in 'a' or 'w' modes
 
 def touch(fname):
 	open(fname, 'a').close()

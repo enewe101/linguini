@@ -1,5 +1,6 @@
 import os
 from datetime import datetime
+from utils import saves_args
 
 
 class ResourceException(Exception):
@@ -9,6 +10,7 @@ class ResourceException(Exception):
 class Resource(object):
 
 
+	@saves_args
 	def __init__(self, **kwargs):
 		self.resolve_static(**kwargs)
 		self.resolve_inherited(**kwargs)
@@ -39,9 +41,7 @@ class Resource(object):
 		lot_is_not_string = not isinstance(self.get_lot(), basestring)
 		lot_is_not_none = self.get_lot() is not None
 		if lot_is_not_string and lot_is_not_none:
-			raise ValueError(
-				'`lot` must be an instance of basestr, like str or unicode.'
-			)
+			raise ValueError('`lot` must be string-like.')
 
 		self._is_ready = True
 
@@ -107,8 +107,13 @@ class Resource(object):
 		)
 
 
+	def copy(self):
+		return self.__class__(*self.args['args'], **self.args['kwargs'])
+
+
 class File(Resource):
 
+	@saves_args
 	def __init__(self, path, fname, **kwargs):
 		self.path = path
 		self.fname = fname
@@ -129,12 +134,16 @@ class File(Resource):
 		return os.path.join(self.path, fname)
 
 
+	def get_dir(self):
+		return os.path.dirname(self.get_path())
+
+
 	def exists(self):
 		return os.path.isfile(self.get_path())
 
 	def open(self, flags):
 
-		# there's some things to check if we're writing to a *new* file
+		# avoid clobbering files (if that's not what we're told to do)
 		if 'w' in flags:
 
 			# if writing, check whether the file exists
@@ -147,21 +156,13 @@ class File(Resource):
 						+ self.get_path()
 					)
 
-
-			# check if the directory exists, if not make it
-			if not os.path.exists(self.path):
-				os.makedirs(self.path)
-
-			# ensure that the directory is not an existing file
-			if os.path.isfile(self.path):
-				raise IOError(
-					'File: the given path corresponds to an existing '
-					'*file*.'
-				)
+		# if we're opining in a write mode, then make dirs if needed
+		if 'a' in flags or 'w' in flags:
+			if not os.path.isdir(self.get_path()):
+				os.makedirs(self.get_path())
 
 		# hands over a plain file handle
 		return open(self.get_path(), flags)
-
 
 
 class MarkerResource(File):
@@ -196,6 +197,7 @@ class IncrementalFile(object):
 		of when the resource was marked done according to local machine's time
 	'''
 
+	@saves_args
 	def __init__(self, path, fname, part_name):
 		self.path = path
 		self.fname = fname
@@ -228,6 +230,7 @@ class Folder(File):
 		namespaced (because the folder is).
 	'''
 
+	@saves_args
 	def __init__(self, path, dirname, *args, **kwargs):
 		self.whitelist = kwargs.pop('whitelist', None)
 		self.blacklist = kwargs.pop('blacklist', None)
@@ -236,7 +239,8 @@ class Folder(File):
 	def get_fname(self, fname):
 		return os.path.join(self.get_path(), fname)
 
-	def open(self, fname, mode):
+
+	def prepare_to_open(self, fname, mode):
 
 		# check if the folder exists yet, if yes, move on
 		if os.path.isdir(self.get_path()):
@@ -276,7 +280,9 @@ class Folder(File):
 					'I do not overwrite by default: %s' % self.get_fname(fname)
 				)
 
-		# if all is good, open and yield the file resource
+
+	def open(self, fname, mode):
+		self.prepare_to_open(fname, mode)
 		return open(self.get_fname(fname), mode)
 
 

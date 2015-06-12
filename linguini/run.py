@@ -94,7 +94,7 @@ class Runner(Task):
 		# at this point we should have a valid lot
 		if not isinstance(self.get_lot(), basestring):
 			raise RunnerException(
-				'no lot defined in %s' % self.__class__.__name__)
+				'lot must be string-like (in %s).' % self.__class__.__name__)
 
 		# resolve tasks
 		self.tasks = self._tasks()
