@@ -14,6 +14,7 @@ class Resource(object):
 	def __init__(self, **kwargs):
 		self.resolve_static(**kwargs)
 		self.resolve_inherited(**kwargs)
+		self.until = kwargs.get('until', None)
 
 
 	def resolve_inherited(self, **kwargs):
