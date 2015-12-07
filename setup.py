@@ -4,11 +4,12 @@ from setuptools import setup
 
 setup(
 	name='linguini',
-	version='1.1.4',
+	version='1.1.7',
 	description='beats both spaghetti and ravioli',
 	author='edward newell',
 	author_email='edward.newell@gmail.com',
 	packages=['linguini'],
+	scripts=['bin/linguini'],
 	license='MIT',
 	classifiers=[
 		'Development Status :: 2 - Pre-Alpha',
@@ -18,7 +19,6 @@ setup(
 		'Programming Language :: Python :: 2.7',
 		'Natural Language :: English',
 		'Topic :: Utilities',
-
 	],
 	keywords='pipe dream'
 )

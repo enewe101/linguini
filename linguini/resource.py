@@ -158,8 +158,8 @@ class File(Resource):
 
 		# if we're opining in a write mode, then make dirs if needed
 		if 'a' in flags or 'w' in flags:
-			if not os.path.isdir(self.get_path()):
-				os.makedirs(self.get_path())
+			if not os.path.isdir(self.get_dir()):
+				os.makedirs(self.get_dir())
 
 		# hands over a plain file handle
 		return open(self.get_path(), flags)

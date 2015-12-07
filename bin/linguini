@@ -1,0 +1,151 @@
+#!/usr/bin/env python
+import imp
+import os
+import sys
+from linguini import basic_layout, academic_layout
+
+
+# quick validation
+if len(sys.argv) not in [2,3]:
+	exit('usage: linguini [-a] <new-project-name>')
+
+
+# Work out the layout option
+layout = None
+if len(sys.argv) == 3:
+	if sys.argv[1] not in ['-a', '-b']:
+		exit('usage: linguini [-a] <new-project-name>')
+	else:
+		layout = sys.argv[1]
+		project_name = sys.argv[2]
+
+else:
+	project_name = sys.argv[1]
+
+# ensure no existing directory at desired project name
+if os.path.exists(os.path.join('.', project_name)):
+	exit(
+		"'%s' already exists.  I can't make a new project there." 
+		% project_name
+	)
+
+
+# load the layout variables
+if layout is None:
+
+	# try to load specification from .linguini.rc
+	try:
+		rc_module = imp.load_source(
+			'linguinirc', os.path.expanduser('~/.linguinirc')
+		)
+
+	# if we couldn't load a .linguini_rc file, just load the basic layout
+	except IOError:
+		DIRS = basic_layout.DIRS
+		FILES = basic_layout.FILES
+
+	# managed to read rc_module, so load it
+	else:
+		try:
+			DIRS = rc_module.DIRS
+			FILES = rc_module.FILES
+		except AttributeError:
+			pass
+
+# specifically requested the academic layout 
+elif layout == '-a':
+	DIRS = academic_layout.DIRS
+	FILES = academic_layout.FILES
+
+# specifically requested the basic layout 
+else: # layout == '-b'
+	DIRS = basic_layout.DIRS
+	FILES = basic_layout.FILES
+
+
+class DirIterException(Exception):
+	pass
+
+
+class DirIter(object):
+
+	def __init__(self, model):
+
+		self.screen_model(model)
+		self.model = model
+
+
+	def screen_model(self, model):
+	
+		if model is None or len(model) == 0:
+			pass
+
+		elif isinstance(model, (basestring, dict)):
+			pass
+
+		if hasattr(model, '__iter__'):
+			pass
+
+		else:
+			raise DirIterException(
+				'the directory model must be a list of '
+				'paths, tuple, or set of paths, or a dictionary that yields '
+				'paths when its keys are recursively prepended to its values '
+				'and values form paths.'
+			)
+
+
+	def __iter__(self):
+		paths = self.recursively_assemble(self.model)
+		return iter(paths)
+
+
+	def recursively_assemble(self, model):
+
+		if model is None or len(model) == 0:
+			return ['']
+
+		if isinstance(model, basestring):
+			return [model]
+
+		if isinstance(model, dict):
+			found_paths = []
+			for key in model:
+				add_paths = self.recursively_assemble(model[key])
+				add_paths = [os.path.join(key, val) for val in add_paths]
+				found_paths.extend(add_paths)
+
+			return found_paths
+
+		if hasattr(model, '__iter__'):
+			return list(model)
+
+		else:
+			raise DirIterException(
+				'unexpected type in model: %s %s' % (str(model), type(model))
+			)
+
+
+# use DirIter to read the DIRS specification into an iterable of paths
+dir_iter = DirIter(DIRS)
+
+# make the directories
+for path in dir_iter:
+	os.makedirs(os.path.join(project_name, path))
+
+# make the files
+for key in FILES:
+	path = key
+	if isinstance(FILES[key][0], basestring):
+		FILES[key] = [FILES[key]]
+
+	for fname, contents in FILES[key]:
+		
+		open(os.path.join(project_name, path, fname), 'w').write(contents)
+
+	
+
+
+
+		
+

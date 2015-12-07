@@ -1,7 +1,25 @@
 LEFT OFF:
-	- still testing inheritance of clobber
-	- overhauled inheritance mechanism, but need to test inheritance
-		of pilot, clobber, and lot
+- Add the ability to run tasks without a runner
+- Add the ability to ensure-path-exists for any directory and file resource
+	- for directories, it ensures the full directory exists, for files
+		only ensures the containing directory (not the file itself) exists.
+	- issues a warning if something else is found there which is not a 
+		directory
+	- for the file it could issue a warning if there is already a file or
+		directory occupying the path of the intended file.
+
+
+- still testing inheritance of clobber
+- overhauled inheritance mechanism, but need to test inheritance
+	of pilot, clobber, and lot
+
+- how is the completeness of sub-runners handled?  Are they always run, and 
+	then their own tasks are checked for completeness?  That would seem to
+	be the best, since it gives fine-grained control of what should be run,
+	by setting clobber=True right on a sub-runner's task
+
+- need to check that shared subrunners don't get re-run
+- ensure that all class variables are copied before use to prevent collisions
 
 - in File resource, use codecs.open, and allow passing a codec
 - enable automatically reading/writing gzip by specifying compress='gzip'
@@ -9,6 +27,7 @@ LEFT OFF:
 - fix resolution of until
 - finish adding clobber keyword functionality
 - ensure that resources don't overwrite files unless in clobber mode
+- make it so that folder and file resources make their path if necessary
 
 x Runners have a simpler syntax for specifying tasks and dependencies.
 
