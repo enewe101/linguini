@@ -128,6 +128,9 @@ class Runner(Task):
 		'''
 
 		task_names = as_list(task_names)
+
+		# Skip tasks
+		task_names = [t for t in task_names if t not in self.skip]
 		scheduled = set()
 
 		for task_name in reversed(task_names):
@@ -234,10 +237,14 @@ class Runner(Task):
 			pilot=False,
 			until=None,
 			clobber=None,
-			share=False
+			share=False,
+			skip=[]
 		):
 
-		self.run(lot, pilot=pilot, until=until, clobber=clobber)
+		self.run(
+			lot, pilot=pilot, until=until, clobber=clobber, share=share, 
+			skip=skip
+		)
 
 
 	def run(
@@ -246,11 +253,21 @@ class Runner(Task):
 			pilot=False,
 			until=None,
 			clobber=False,
-			share=False
+			share=False,
+			skip=[]
 		):
 
 		self.share = share
 
+		# Register and validate list of tasks to be skipped
+		self.skip = skip
+		if not isinstance(skip, list):
+			raise ValueError(
+				'skip keyword takes a python list of task names as strings')
+
+		print 'skipping:', skip
+
+		# Get ready
 		self.get_ready(
 			lot=lot, 
 			pilot=pilot,
