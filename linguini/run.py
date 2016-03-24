@@ -1,3 +1,4 @@
+import sys
 from task import Task
 from resource import Resource, File
 
@@ -117,7 +118,7 @@ class Runner(Task):
 		self._is_ready = True
 
 
-	def recursively_schedule(self, task_names):
+	def recursively_schedule(self, task_names, recurse=True):
 		'''
 			accepts the name of a task, or an iterable thereof, and schedules
 			those among them which are not done, as well as their 
@@ -145,6 +146,8 @@ class Runner(Task):
 				scheduled.add(task_name)
 
 				# schedule dependant jobs, if any
+				if not recurse:
+					continue
 				try:
 					scheduled |= (self.recursively_schedule(dependencies))
 				except KeyError:
@@ -254,10 +257,15 @@ class Runner(Task):
 			until=None,
 			clobber=False,
 			share=False,
-			skip=[]
+			skip=[],
+			just=None
 		):
 
 		self.share = share
+
+		self.just = just
+		if self.just is not None:
+			print 'Only doing', self.just
 
 		# Register and validate list of tasks to be skipped
 		self.skip = skip
@@ -298,7 +306,12 @@ class Runner(Task):
 			raise RunnerException(problem)
 
 		# schedule the necessary tasks
-		self.schedule = self.recursively_schedule(until)
+		if self.just is not None:
+			self.schedule = self.recursively_schedule(self.just, recurse=False)
+		else:
+			self.schedule = self.recursively_schedule(until)
+
+		print '\t*** THE FOLLOWING TASKS WERE SCHEDULED', self.schedule
 
 		# run the tasks
 		self.run_schedule()
